@@ -1,215 +1,249 @@
 import { Router, Request, Response } from 'express';
-import db from '../db';
+import pool from '../db';
 import { generateDraft } from '../services/campaignDraftService';
 import type { CampaignType } from '../services/campaignDraftService';
 
 const router = Router();
 
-// ── Campaigns CRUD ────────────────────────────────────────────────────────────
-
-router.get('/', (_req: Request, res: Response) => {
-  const campaigns = db.prepare(`
-    SELECT c.*,
-      COUNT(cj.id) as journalistCount,
-      SUM(CASE WHEN cj.draftStatus = 'approved' THEN 1 ELSE 0 END) as approvedCount,
-      SUM(CASE WHEN cj.draftStatus = 'sent' THEN 1 ELSE 0 END) as sentCount
-    FROM campaigns c
-    LEFT JOIN campaign_journalists cj ON cj.campaignId = c.id
-    GROUP BY c.id
-    ORDER BY c.createdAt DESC
-  `).all();
-  res.json(campaigns);
-});
-
-router.get('/:id', (req: Request, res: Response) => {
-  const campaign = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(req.params.id);
-  if (!campaign) return res.status(404).json({ error: 'Not found' });
-  res.json(campaign);
-});
-
-router.post('/', (req: Request, res: Response) => {
-  const { name, type = 'cold_intro', brief = '', status = 'draft' } = req.body;
-  if (!name) return res.status(400).json({ error: 'name is required' });
-  const result = db.prepare(`
-    INSERT INTO campaigns (name, type, brief, status) VALUES (@name, @type, @brief, @status)
-  `).run({ name, type, brief, status });
-  res.status(201).json(db.prepare('SELECT * FROM campaigns WHERE id = ?').get(result.lastInsertRowid));
-});
-
-router.put('/:id', (req: Request, res: Response) => {
-  const existing = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(req.params.id) as any;
-  if (!existing) return res.status(404).json({ error: 'Not found' });
-  const { name = existing.name, type = existing.type, brief = existing.brief, status = existing.status } = req.body;
-  db.prepare(`
-    UPDATE campaigns SET name=@name, type=@type, brief=@brief, status=@status, updatedAt=datetime('now') WHERE id=@id
-  `).run({ name, type, brief, status, id: req.params.id });
-  res.json(db.prepare('SELECT * FROM campaigns WHERE id = ?').get(req.params.id));
-});
-
-router.delete('/:id', (req: Request, res: Response) => {
-  db.prepare('DELETE FROM campaigns WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
-});
-
-// ── Campaign journalists ───────────────────────────────────────────────────────
-
-// GET all journalists in a campaign (with journalist details + draft)
-router.get('/:id/journalists', (req: Request, res: Response) => {
-  const rows = db.prepare(`
-    SELECT cj.*, j.name, j.publication, j.beat, j.roleTitle, j.email,
-           j.outreachStatus, j.totalScore, j.priorityTier, j.bestPitchAngle,
-           j.isFavorite, j.staleFlag
-    FROM campaign_journalists cj
-    JOIN journalists j ON j.id = cj.journalistId
-    WHERE cj.campaignId = ?
-    ORDER BY j.totalScore DESC
-  `).all(req.params.id);
-  res.json(rows);
-});
-
-// POST add journalists to a campaign (bulk)
-router.post('/:id/journalists', (req: Request, res: Response) => {
-  const { journalistIds }: { journalistIds: number[] } = req.body;
-  if (!Array.isArray(journalistIds) || journalistIds.length === 0) {
-    return res.status(400).json({ error: 'journalistIds array is required' });
+// GET all campaigns
+router.get('/', async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT c.*,
+        COUNT(cj.id)::int as "journalistCount",
+        SUM(CASE WHEN cj."draftStatus" = 'approved' THEN 1 ELSE 0 END)::int as "approvedCount",
+        SUM(CASE WHEN cj."draftStatus" = 'sent' THEN 1 ELSE 0 END)::int as "sentCount"
+      FROM campaigns c
+      LEFT JOIN campaign_journalists cj ON cj."campaignId" = c.id
+      GROUP BY c.id
+      ORDER BY c."createdAt" DESC
+    `);
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  const campaign = db.prepare('SELECT id FROM campaigns WHERE id = ?').get(req.params.id);
-  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+});
 
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO campaign_journalists (campaignId, journalistId)
-    VALUES (?, ?)
-  `);
-  const insertMany = db.transaction(() => {
-    for (const jid of journalistIds) insert.run(req.params.id, jid);
-  });
-  insertMany();
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT * FROM campaigns WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-  res.json({ added: journalistIds.length });
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const { name, type = 'cold_intro', brief = '', status = 'draft' } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    const result = await pool.query(
+      'INSERT INTO campaigns (name, type, brief, status) VALUES ($1,$2,$3,$4) RETURNING id',
+      [name, type, brief, status]
+    );
+    const created = (await pool.query('SELECT * FROM campaigns WHERE id = $1', [result.rows[0].id])).rows[0];
+    res.status(201).json(created);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const existing = (await pool.query('SELECT * FROM campaigns WHERE id = $1', [req.params.id])).rows[0];
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    const { name = existing.name, type = existing.type, brief = existing.brief, status = existing.status } = req.body;
+    await pool.query(
+      'UPDATE campaigns SET name=$1, type=$2, brief=$3, status=$4, "updatedAt"=NOW() WHERE id=$5',
+      [name, type, brief, status, req.params.id]
+    );
+    res.json((await pool.query('SELECT * FROM campaigns WHERE id = $1', [req.params.id])).rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    await pool.query('DELETE FROM campaigns WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET journalists in a campaign
+router.get('/:id/journalists', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT cj.*, j.name, j.publication, j.beat, j."roleTitle", j.email,
+             j."outreachStatus", j."totalScore", j."priorityTier", j."bestPitchAngle",
+             j."isFavorite", j."staleFlag"
+      FROM campaign_journalists cj
+      JOIN journalists j ON j.id = cj."journalistId"
+      WHERE cj."campaignId" = $1
+      ORDER BY j."totalScore" DESC
+    `, [req.params.id]);
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST add journalists to campaign (bulk)
+router.post('/:id/journalists', async (req: Request, res: Response) => {
+  try {
+    const { journalistIds }: { journalistIds: number[] } = req.body;
+    if (!Array.isArray(journalistIds) || journalistIds.length === 0) {
+      return res.status(400).json({ error: 'journalistIds array is required' });
+    }
+    const campaign = (await pool.query('SELECT id FROM campaigns WHERE id = $1', [req.params.id])).rows[0];
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const jid of journalistIds) {
+        await client.query(
+          'INSERT INTO campaign_journalists ("campaignId", "journalistId") VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [req.params.id, jid]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    res.json({ added: journalistIds.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // DELETE remove a journalist from a campaign
-router.delete('/:id/journalists/:journalistId', (req: Request, res: Response) => {
-  db.prepare('DELETE FROM campaign_journalists WHERE campaignId = ? AND journalistId = ?')
-    .run(req.params.id, req.params.journalistId);
-  res.json({ success: true });
+router.delete('/:id/journalists/:journalistId', async (req: Request, res: Response) => {
+  try {
+    await pool.query(
+      'DELETE FROM campaign_journalists WHERE "campaignId" = $1 AND "journalistId" = $2',
+      [req.params.id, req.params.journalistId]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// POST generate Claude drafts for all pending journalists in a campaign
+// POST generate Claude drafts for all pending journalists
 router.post('/:id/generate-drafts', async (req: Request, res: Response) => {
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set on the server' });
   }
+  try {
+    const campaign = (await pool.query('SELECT * FROM campaigns WHERE id = $1', [req.params.id])).rows[0];
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
 
-  const campaign = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(req.params.id) as any;
-  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    const pending = (await pool.query(
+      'SELECT "journalistId" FROM campaign_journalists WHERE "campaignId" = $1 AND "draftStatus" = \'pending\'',
+      [req.params.id]
+    )).rows;
 
-  const pending = db.prepare(`
-    SELECT cj.journalistId FROM campaign_journalists cj
-    WHERE cj.campaignId = ? AND cj.draftStatus = 'pending'
-  `).all(req.params.id) as any[];
+    if (pending.length === 0) return res.json({ count: 0, message: 'No pending drafts to generate.' });
 
-  if (pending.length === 0) {
-    return res.json({ count: 0, message: 'No pending drafts to generate.' });
-  }
+    res.json({
+      count: pending.length,
+      message: `Generating ${pending.length} draft${pending.length !== 1 ? 's' : ''} with Claude. Refresh to see them appear.`,
+    });
 
-  res.json({
-    count: pending.length,
-    message: `Generating ${pending.length} draft${pending.length !== 1 ? 's' : ''} with Claude. This will take about ${Math.ceil(pending.length * 15 / 60)} minute${pending.length > 4 ? 's' : ''}. Refresh the page to see them appear.`,
-  });
-
-  // Background generation
-  (async () => {
-    for (const { journalistId } of pending) {
-      const draft = await generateDraft(journalistId, campaign.type as CampaignType, campaign.brief);
-      if (draft) {
-        db.prepare(`
-          UPDATE campaign_journalists SET draftSubject = @subject, draftBody = @body, draftStatus = 'ready'
-          WHERE campaignId = @campaignId AND journalistId = @journalistId
-        `).run({ subject: draft.subject, body: draft.body, campaignId: campaign.id, journalistId });
-        console.log(`[CampaignDraft] ✓ Draft ready for journalist ${journalistId}`);
-      } else {
-        db.prepare(`
-          UPDATE campaign_journalists SET draftStatus = 'failed'
-          WHERE campaignId = @campaignId AND journalistId = @journalistId
-        `).run({ campaignId: campaign.id, journalistId });
+    (async () => {
+      for (const { journalistId } of pending) {
+        const draft = await generateDraft(journalistId, campaign.type as CampaignType, campaign.brief);
+        if (draft) {
+          await pool.query(`
+            UPDATE campaign_journalists SET "draftSubject"=$1, "draftBody"=$2, "draftStatus"='ready'
+            WHERE "campaignId"=$3 AND "journalistId"=$4
+          `, [draft.subject, draft.body, campaign.id, journalistId]);
+        } else {
+          await pool.query(
+            "UPDATE campaign_journalists SET \"draftStatus\"='failed' WHERE \"campaignId\"=$1 AND \"journalistId\"=$2",
+            [campaign.id, journalistId]
+          );
+        }
+        await new Promise(r => setTimeout(r, 2000));
       }
-      await new Promise(r => setTimeout(r, 2000));
-    }
-    console.log(`[CampaignDraft] Done — ${pending.length} drafts processed.`);
-  })();
+      console.log(`[CampaignDraft] Done — ${pending.length} drafts processed.`);
+    })();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// PUT update a single draft (subject/body edit + approval)
-router.put('/:id/journalists/:journalistId/draft', (req: Request, res: Response) => {
-  const { draftSubject, draftBody, draftStatus } = req.body;
-  db.prepare(`
-    UPDATE campaign_journalists
-    SET draftSubject = COALESCE(@subject, draftSubject),
-        draftBody    = COALESCE(@body, draftBody),
-        draftStatus  = COALESCE(@status, draftStatus)
-    WHERE campaignId = @campaignId AND journalistId = @journalistId
-  `).run({
-    subject: draftSubject ?? null,
-    body: draftBody ?? null,
-    status: draftStatus ?? null,
-    campaignId: req.params.id,
-    journalistId: req.params.journalistId,
-  });
-  res.json({ success: true });
+// PUT update a single draft
+router.put('/:id/journalists/:journalistId/draft', async (req: Request, res: Response) => {
+  try {
+    const { draftSubject, draftBody, draftStatus } = req.body;
+    await pool.query(`
+      UPDATE campaign_journalists
+      SET "draftSubject" = COALESCE($1, "draftSubject"),
+          "draftBody"    = COALESCE($2, "draftBody"),
+          "draftStatus"  = COALESCE($3, "draftStatus")
+      WHERE "campaignId" = $4 AND "journalistId" = $5
+    `, [draftSubject ?? null, draftBody ?? null, draftStatus ?? null, req.params.id, req.params.journalistId]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// POST mark a draft as sent — logs to outreach_logs, triggers status sync
-router.post('/:id/journalists/:journalistId/send', (req: Request, res: Response) => {
-  const cj = db.prepare(`
-    SELECT cj.*, j.publication FROM campaign_journalists cj
-    JOIN journalists j ON j.id = cj.journalistId
-    WHERE cj.campaignId = ? AND cj.journalistId = ?
-  `).get(req.params.id, req.params.journalistId) as any;
+// POST mark a draft as sent
+router.post('/:id/journalists/:journalistId/send', async (req: Request, res: Response) => {
+  try {
+    const cj = (await pool.query(`
+      SELECT cj.*, j.publication FROM campaign_journalists cj
+      JOIN journalists j ON j.id = cj."journalistId"
+      WHERE cj."campaignId" = $1 AND cj."journalistId" = $2
+    `, [req.params.id, req.params.journalistId])).rows[0];
 
-  if (!cj) return res.status(404).json({ error: 'Not found' });
+    if (!cj) return res.status(404).json({ error: 'Not found' });
 
-  const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    const messageType = getCampaignMessageType(req.body.campaignType || 'cold_intro');
 
-  // Create outreach log entry
-  const logResult = db.prepare(`
-    INSERT INTO outreach_logs (journalistId, date, channel, messageType, subjectLine, messageBody, status, nextStep)
-    VALUES (@journalistId, @date, 'Email', @messageType, @subjectLine, @messageBody, 'Sent', 'Follow up in 7 days if no response')
-  `).run({
-    journalistId: req.params.journalistId,
-    date: today,
-    messageType: getCampaignMessageType(req.body.campaignType || 'cold_intro'),
-    subjectLine: cj.draftSubject,
-    messageBody: cj.draftBody,
-  });
+    const logResult = await pool.query(`
+      INSERT INTO outreach_logs ("journalistId", date, channel, "messageType", "subjectLine", "messageBody", status, "nextStep")
+      VALUES ($1,$2,'Email',$3,$4,$5,'Sent','Follow up in 7 days if no response') RETURNING id
+    `, [req.params.journalistId, today, messageType, cj.draftSubject, cj.draftBody]);
 
-  // Mark draft as sent
-  db.prepare(`
-    UPDATE campaign_journalists SET draftStatus = 'sent', sentAt = @sentAt
-    WHERE campaignId = @campaignId AND journalistId = @journalistId
-  `).run({ sentAt: today, campaignId: req.params.id, journalistId: req.params.journalistId });
+    await pool.query(
+      'UPDATE campaign_journalists SET "draftStatus"=\'sent\', "sentAt"=$1 WHERE "campaignId"=$2 AND "journalistId"=$3',
+      [today, req.params.id, req.params.journalistId]
+    );
 
-  // Sync journalist status (imported inline to avoid circular deps)
-  syncJournalistAfterSend(Number(req.params.journalistId), today);
+    syncJournalistAfterSend(Number(req.params.journalistId), today).catch(console.error);
 
-  res.json({ success: true, outreachLogId: logResult.lastInsertRowid });
+    res.json({ success: true, outreachLogId: logResult.rows[0].id });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 function getCampaignMessageType(type: string): string {
   switch (type) {
-    case 'cold_intro':    return 'Initial Pitch';
-    case 'event':         return 'Story Tip';
-    case 'hackathon':     return 'Story Tip';
+    case 'cold_intro': return 'Initial Pitch';
+    case 'event': return 'Story Tip';
+    case 'hackathon': return 'Story Tip';
     case 'founder_promo': return 'Story Tip';
-    default:              return 'Initial Pitch';
+    default: return 'Initial Pitch';
   }
 }
 
-function syncJournalistAfterSend(journalistId: number, date: string) {
-  // Same logic as outreach route syncJournalistStatus
-  const logs = db.prepare(
-    "SELECT * FROM outreach_logs WHERE journalistId = ? ORDER BY date DESC, createdAt DESC"
-  ).all(journalistId) as any[];
+async function syncJournalistAfterSend(journalistId: number, date: string): Promise<void> {
+  const logs = (await pool.query(
+    'SELECT * FROM outreach_logs WHERE "journalistId" = $1 ORDER BY date DESC, "createdAt" DESC',
+    [journalistId]
+  )).rows;
 
   const priority: Record<string, number> = {
     'Not a Fit': 8, 'Declined': 8, 'Covered': 7, 'Meeting Scheduled': 6,
@@ -235,14 +269,14 @@ function syncJournalistAfterSend(journalistId: number, date: string) {
   followUp.setDate(followUp.getDate() + 7);
   const followUpDate = followUp.toISOString().split('T')[0];
 
-  db.prepare(`
+  await pool.query(`
     UPDATE journalists SET
-      outreachStatus    = @status,
-      lastContactedDate = @lcd,
-      nextFollowUpDate  = CASE WHEN nextFollowUpDate IS NULL OR nextFollowUpDate = '' THEN @fud ELSE nextFollowUpDate END,
-      updatedAt         = datetime('now')
-    WHERE id = @id
-  `).run({ status: newStatus, lcd: date, fud: followUpDate, id: journalistId });
+      "outreachStatus" = $1,
+      "lastContactedDate" = $2,
+      "nextFollowUpDate" = CASE WHEN "nextFollowUpDate" IS NULL OR "nextFollowUpDate" = '' THEN $3 ELSE "nextFollowUpDate" END,
+      "updatedAt" = NOW()
+    WHERE id = $4
+  `, [newStatus, date, followUpDate, journalistId]);
 }
 
 export default router;

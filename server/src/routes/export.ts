@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import db from '../db';
+import pool from '../db';
 
 const router = Router();
 
@@ -16,25 +16,37 @@ function toCSV(rows: any[]): string {
   return lines.join('\n');
 }
 
-router.get('/journalists', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM journalists ORDER BY totalScore DESC').all();
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="journalists.csv"');
-  res.send(toCSV(rows));
+router.get('/journalists', async (_req: Request, res: Response) => {
+  try {
+    const rows = (await pool.query('SELECT * FROM journalists ORDER BY "totalScore" DESC')).rows;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="journalists.csv"');
+    res.send(toCSV(rows));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/articles', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM articles ORDER BY publishDate DESC').all();
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="articles.csv"');
-  res.send(toCSV(rows));
+router.get('/articles', async (_req: Request, res: Response) => {
+  try {
+    const rows = (await pool.query('SELECT * FROM articles ORDER BY "publishDate" DESC')).rows;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="articles.csv"');
+    res.send(toCSV(rows));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/outreach', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM outreach_logs ORDER BY date DESC').all();
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="outreach_logs.csv"');
-  res.send(toCSV(rows));
+router.get('/outreach', async (_req: Request, res: Response) => {
+  try {
+    const rows = (await pool.query('SELECT * FROM outreach_logs ORDER BY date DESC')).rows;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="outreach_logs.csv"');
+    res.send(toCSV(rows));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

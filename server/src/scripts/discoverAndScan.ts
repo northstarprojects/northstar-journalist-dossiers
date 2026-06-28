@@ -4,16 +4,16 @@
  *   node_modules/.bin/ts-node src/scripts/discoverAndScan.ts
  */
 
-import db from '../db';
+import pool from '../db';
 import { discoverAndSaveFeeds } from '../services/categoryFeedDiscovery';
 import { scanAllRssFeeds } from '../services/rssService';
 
 async function main() {
-  const pubs = db.prepare(`
+  const pubs = (await pool.query(`
     SELECT id, name, url FROM publications
-    WHERE active = 1 AND isVirtual = 0 AND url IS NOT NULL AND url != ''
+    WHERE active = 1 AND "isVirtual" = 0 AND url IS NOT NULL AND url != ''
     ORDER BY tier ASC, name ASC
-  `).all() as { id: number; name: string; url: string }[];
+  `)).rows as { id: number; name: string; url: string }[];
 
   console.log(`\n⚡ Discovering category feeds for ${pubs.length} publications...\n`);
 

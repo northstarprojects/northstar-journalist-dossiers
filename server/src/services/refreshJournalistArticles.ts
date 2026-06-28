@@ -1,17 +1,10 @@
 /**
  * Weekly journalist article refresh service.
- *
- * For every tracked journalist (not Declined / Not a Fit), scans their
- * publication's RSS feeds for new articles. Adds any new ones to the
- * articles table. If no article has been seen from them in the last 30 days,
- * sets staleFlag = 1 and outreachStatus = 'On Hold' (if they were Researching
- * or Ready to Pitch) so the user knows to verify before pitching.
- *
- * Cron: Fridays 7am ET  (configured in index.ts)
+ * Scans RSS feeds for new articles per journalist, flags stale ones.
  */
 
 import Parser from 'rss-parser';
-import db from '../db';
+import pool from '../db';
 
 const parser = new Parser({
   timeout: 10000,
@@ -29,73 +22,42 @@ export interface RefreshResult {
   error?: string;
 }
 
-/** Normalise an author name for loose comparison */
 function normaliseName(name: string): string {
   return name.toLowerCase().replace(/[^a-z\s]/g, '').trim();
 }
-
-/** Extract author string from an RSS item */
 function extractAuthor(item: any): string | null {
-  const raw =
-    item.creator || item.author || item['dc:creator'] ||
-    (item.itunes?.author) || null;
+  const raw = item.creator || item.author || item['dc:creator'] || (item.itunes?.author) || null;
   if (!raw || typeof raw !== 'string') return null;
-  return raw
-    .replace(/^[^\s(]+@[^\s(]+\s*/, '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\(([^)]+)\)/, '$1')
-    .trim() || null;
+  return raw.replace(/^[^\s(]+@[^\s(]+\s*/, '').replace(/<[^>]+>/g, '').replace(/\(([^)]+)\)/, '$1').trim() || null;
 }
 
 export async function refreshAllJournalistArticles(): Promise<RefreshResult[]> {
-  const SKIP_STATUSES = new Set(['Declined', 'Not a Fit']);
-
-  // All journalists we actively track
-  const journalists = db.prepare(`
-    SELECT j.*, p.id as pubId
+  const journalists = (await pool.query(`
+    SELECT j.*, p.id as "pubId"
     FROM journalists j
     LEFT JOIN publications p ON LOWER(p.name) = LOWER(j.publication)
-    WHERE j.outreachStatus NOT IN ('Declined', 'Not a Fit')
+    WHERE j."outreachStatus" NOT IN ('Declined', 'Not a Fit')
     ORDER BY j.id ASC
-  `).all() as any[];
+  `)).rows;
 
   console.log(`[ArticleRefresh] Starting refresh for ${journalists.length} journalists...`);
-
   const results: RefreshResult[] = [];
   const staleThreshold = new Date();
   staleThreshold.setDate(staleThreshold.getDate() - STALE_DAYS);
 
   for (const j of journalists) {
-    const result: RefreshResult = {
-      journalistId: j.id,
-      name: j.name,
-      publication: j.publication,
-      newArticles: 0,
-      isStale: false,
-    };
-
+    const result: RefreshResult = { journalistId: j.id, name: j.name, publication: j.publication, newArticles: 0, isStale: false };
     try {
-      if (!j.pubId) {
-        result.error = 'publication not found in DB';
-        results.push(result);
-        continue;
-      }
+      if (!j.pubId) { result.error = 'publication not found in DB'; results.push(result); continue; }
 
-      // Get all feeds for this publication
-      const feeds = db.prepare(
-        "SELECT * FROM publication_feeds WHERE publicationId = ? AND rssStatus != 'inactive'"
-      ).all(j.pubId) as any[];
+      const feeds = (await pool.query(
+        "SELECT * FROM publication_feeds WHERE \"publicationId\" = $1 AND \"rssStatus\" != 'inactive'",
+        [j.pubId]
+      )).rows;
+      if (feeds.length === 0) { result.error = 'no active feeds'; results.push(result); continue; }
 
-      if (feeds.length === 0) {
-        result.error = 'no active feeds';
-        results.push(result);
-        continue;
-      }
-
-      // Existing article URLs for this journalist (for dedup)
       const existingUrls = new Set(
-        (db.prepare('SELECT url FROM articles WHERE journalistId = ?').all(j.id) as any[])
-          .map((a: any) => a.url)
+        (await pool.query('SELECT url FROM articles WHERE "journalistId" = $1', [j.id])).rows.map((a: any) => a.url)
       );
 
       const normTarget = normaliseName(j.name);
@@ -108,97 +70,54 @@ export async function refreshAllJournalistArticles(): Promise<RefreshResult[]> {
           for (const item of parsed.items ?? []) {
             const author = extractAuthor(item);
             if (!author) continue;
-
-            // Loose name match — handles "Kyle Wiggers" vs "Kyle Wiggers, TechCrunch"
-            if (!normaliseName(author).includes(normTarget) &&
-                !normTarget.includes(normaliseName(author))) continue;
-
+            if (!normaliseName(author).includes(normTarget) && !normTarget.includes(normaliseName(author))) continue;
             const url = item.link || item.guid || '';
             if (!url || existingUrls.has(url)) continue;
-
             const pubDate = item.pubDate ? new Date(item.pubDate) : null;
-            if (mostRecentDate === null || (pubDate && pubDate > mostRecentDate)) {
-              mostRecentDate = pubDate;
-            }
-
-            newArticles.push({
-              title: item.title || '',
-              url,
-              date: item.pubDate || '',
-            });
-            existingUrls.add(url);  // prevent double-adding within same scan
+            if (mostRecentDate === null || (pubDate && pubDate > mostRecentDate)) mostRecentDate = pubDate;
+            newArticles.push({ title: item.title || '', url, date: item.pubDate || '' });
+            existingUrls.add(url);
           }
-        } catch {
-          // individual feed failure — keep going
-        }
+        } catch { /* individual feed failure — keep going */ }
         await new Promise(r => setTimeout(r, 300));
       }
 
-      // Insert new articles
       if (newArticles.length > 0) {
-        const insert = db.prepare(`
-          INSERT OR IGNORE INTO articles (journalistId, title, url, publication, publishDate, topic)
-          VALUES (@journalistId, @title, @url, @publication, @publishDate, @topic)
-        `);
-        const insertMany = db.transaction(() => {
-          for (const a of newArticles) {
-            insert.run({
-              journalistId: j.id,
-              title: a.title,
-              url: a.url,
-              publication: j.publication,
-              publishDate: a.date,
-              topic: j.beat || '',
-            });
-          }
-        });
-        insertMany();
+        for (const a of newArticles) {
+          await pool.query(`
+            INSERT INTO articles ("journalistId", title, url, publication, "publishDate", topic)
+            VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING
+          `, [j.id, a.title, a.url, j.publication, a.date, j.beat || '']);
+        }
         result.newArticles = newArticles.length;
       }
 
-      // ── Staleness check ────────────────────────────────────────────────────
-      // Get the most recent article date across ALL articles for this journalist
-      const latestRow = db.prepare(`
-        SELECT MAX(publishDate) as latest, MAX(createdAt) as latestCreated
-        FROM articles WHERE journalistId = ?
-      `).get(j.id) as any;
-
-      // Use publishDate if valid, otherwise fall back to when we added it
-      const latestDateStr = latestRow?.latest || latestRow?.latestCreated || '';
+      const latestRow = (await pool.query(
+        'SELECT MAX("publishDate") as latest, MAX("createdAt") as "latestCreated" FROM articles WHERE "journalistId" = $1',
+        [j.id]
+      )).rows[0];
+      const latestDateStr = latestRow?.latest || '';
       const latestDate = latestDateStr ? new Date(latestDateStr) : null;
-
       const isStale = !latestDate || latestDate < staleThreshold;
       result.isStale = isStale;
 
       if (isStale) {
-        db.prepare(`
-          UPDATE journalists SET staleFlag = 1, updatedAt = datetime('now') WHERE id = ?
-        `).run(j.id);
+        await pool.query('UPDATE journalists SET "staleFlag" = 1, "updatedAt" = NOW() WHERE id = $1', [j.id]);
       } else {
-        // Clear stale flag if they've published recently
-        db.prepare(`
-          UPDATE journalists SET
-            staleFlag = 0,
-            lastArticleDate = ?,
-            updatedAt = datetime('now')
-          WHERE id = ?
-        `).run(latestDateStr, j.id);
+        await pool.query(
+          'UPDATE journalists SET "staleFlag" = 0, "lastArticleDate" = $1, "updatedAt" = NOW() WHERE id = $2',
+          [latestDateStr, j.id]
+        );
       }
-
     } catch (err: any) {
       result.error = err.message;
     }
-
     results.push(result);
-    await new Promise(r => setTimeout(r, 800)); // polite delay between journalists
+    await new Promise(r => setTimeout(r, 800));
   }
 
   const newTotal = results.reduce((s, r) => s + r.newArticles, 0);
   const staleCount = results.filter(r => r.isStale).length;
-  console.log(
-    `[ArticleRefresh] Done. ${newTotal} new articles added. ` +
-    `${staleCount} journalist${staleCount !== 1 ? 's' : ''} flagged stale (no articles in ${STALE_DAYS} days).`
-  );
-
+  console.log(`[ArticleRefresh] Done. ${newTotal} new articles. ${staleCount} stale journalist(s).`);
   return results;
 }

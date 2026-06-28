@@ -1,176 +1,153 @@
 import { Router, Request, Response } from 'express';
-import db from '../db';
+import pool from '../db';
 
 const router = Router();
 
-// ── Status sync ───────────────────────────────────────────────────────────────
-// Called after every create / update / delete so journalist.outreachStatus
-// always reflects the most advanced real state across all logged interactions.
-//
-// Log status priority (higher = more advanced):
-//   Covered (7) > Meeting Scheduled / In Conversation (6) > Responded (5)
-//   > Sent / No Response (3) > Draft (0, ignored)
-//   Not a Fit / Declined (8) — terminal, overrides everything
-//
-// The journalist status is always driven upward by the highest-priority log.
-// Deleting a log can move the status back down to reflect what remains.
-
 const LOG_PRIORITY: Record<string, number> = {
-  'Not a Fit':         8,
-  'Declined':          8,
-  'Covered':           7,
-  'Meeting Scheduled': 6,
-  'Responded':         5,
-  'Sent':              3,
-  'No Response':       3,
-  'Draft':             0,
+  'Not a Fit': 8, 'Declined': 8, 'Covered': 7, 'Meeting Scheduled': 6,
+  'Responded': 5, 'Sent': 3, 'No Response': 3, 'Draft': 0,
 };
-
 const LOG_TO_JOURNALIST_STATUS: Record<string, string> = {
-  'Not a Fit':         'Not a Fit',
-  'Declined':          'Not a Fit',
-  'Covered':           'Covered',
-  'Meeting Scheduled': 'In Conversation',
-  'Responded':         'Responded',
-  'Sent':              'Pitched',
-  'No Response':       'Pitched',
+  'Not a Fit': 'Not a Fit', 'Declined': 'Not a Fit', 'Covered': 'Covered',
+  'Meeting Scheduled': 'In Conversation', 'Responded': 'Responded',
+  'Sent': 'Pitched', 'No Response': 'Pitched',
 };
 
-function syncJournalistStatus(journalistId: number) {
-  const logs = db.prepare(
-    "SELECT * FROM outreach_logs WHERE journalistId = ? ORDER BY date DESC, createdAt DESC"
-  ).all(journalistId) as any[];
+async function syncJournalistStatus(journalistId: number): Promise<void> {
+  const logs = (await pool.query(
+    'SELECT * FROM outreach_logs WHERE "journalistId" = $1 ORDER BY date DESC, "createdAt" DESC',
+    [journalistId]
+  )).rows;
 
   if (logs.length === 0) {
-    // All logs deleted — reset to Researching (still in system, just no history)
-    db.prepare(
-      "UPDATE journalists SET outreachStatus = 'Researching', lastContactedDate = '', updatedAt = datetime('now') WHERE id = ?"
-    ).run(journalistId);
+    await pool.query(
+      "UPDATE journalists SET \"outreachStatus\" = 'Researching', \"lastContactedDate\" = '', \"updatedAt\" = NOW() WHERE id = $1",
+      [journalistId]
+    );
     return;
   }
 
-  // Find the highest-priority log status
   let bestStatus = '';
   let bestPriority = -1;
-
   for (const log of logs) {
     const p = LOG_PRIORITY[log.status] ?? 0;
-    if (p > bestPriority) {
-      bestPriority = p;
-      bestStatus = log.status;
-    }
+    if (p > bestPriority) { bestPriority = p; bestStatus = log.status; }
   }
-
-  // Only act on logs that matter (ignore draft-only histories)
   if (bestPriority <= 0) return;
 
   const newOutreachStatus = LOG_TO_JOURNALIST_STATUS[bestStatus];
   if (!newOutreachStatus) return;
 
-  // Most recent non-draft sent date → lastContactedDate
   const lastSent = logs.find(l => l.status !== 'Draft' && l.date);
   const lastContactedDate = lastSent?.date || '';
 
-  // Auto-set follow-up date to +7 days from last sent, if not already set
-  // and status is Pitched (i.e. we just sent and are waiting)
-  let followUpUpdate = '';
+  let followUpDate = '';
   if (newOutreachStatus === 'Pitched' && lastContactedDate) {
     const followUp = new Date(lastContactedDate);
     followUp.setDate(followUp.getDate() + 7);
-    followUpUpdate = followUp.toISOString().split('T')[0];
+    followUpDate = followUp.toISOString().split('T')[0];
   }
 
-  db.prepare(`
+  await pool.query(`
     UPDATE journalists SET
-      outreachStatus      = @status,
-      lastContactedDate   = CASE WHEN @lcd != '' THEN @lcd ELSE lastContactedDate END,
-      nextFollowUpDate    = CASE WHEN @fud != '' AND (nextFollowUpDate IS NULL OR nextFollowUpDate = '') THEN @fud ELSE nextFollowUpDate END,
-      updatedAt           = datetime('now')
-    WHERE id = @id
-  `).run({ status: newOutreachStatus, lcd: lastContactedDate, fud: followUpUpdate, id: journalistId });
+      "outreachStatus" = $1,
+      "lastContactedDate" = CASE WHEN $2 != '' THEN $2 ELSE "lastContactedDate" END,
+      "nextFollowUpDate" = CASE WHEN $3 != '' AND ("nextFollowUpDate" IS NULL OR "nextFollowUpDate" = '') THEN $3 ELSE "nextFollowUpDate" END,
+      "updatedAt" = NOW()
+    WHERE id = $4
+  `, [newOutreachStatus, lastContactedDate, followUpDate, journalistId]);
 
   console.log(`[OutreachSync] Journalist ${journalistId} → ${newOutreachStatus}`);
 }
 
-// ── Routes ────────────────────────────────────────────────────────────────────
+// GET /activity — full activity feed
+router.get('/activity', async (req: Request, res: Response) => {
+  try {
+    const { publication, status, from, to, limit = '200' } = req.query as Record<string, string>;
+    let where = '1=1';
+    const params: any[] = [];
+    let n = 1;
 
-/**
- * GET /api/outreach/activity
- * Full activity feed — all outreach logs across all journalists.
- * Query params: publication, status, from (YYYY-MM-DD), to (YYYY-MM-DD), limit
- */
-router.get('/activity', (req: Request, res: Response) => {
-  const { publication, status, from, to, limit = '200' } = req.query as Record<string, string>;
+    if (publication) { where += ` AND j.publication = $${n++}`; params.push(publication); }
+    if (status)      { where += ` AND ol.status = $${n++}`;      params.push(status); }
+    if (from)        { where += ` AND ol.date >= $${n++}`;        params.push(from); }
+    if (to)          { where += ` AND ol.date <= $${n++}`;        params.push(to); }
 
-  let where = '1=1';
-  const params: any[] = [];
+    const rows = (await pool.query(`
+      SELECT ol.*, j.name AS "journalistName", j.publication AS publication,
+             j."outreachStatus" AS "journalistStatus"
+      FROM outreach_logs ol
+      JOIN journalists j ON j.id = ol."journalistId"
+      WHERE ${where}
+      ORDER BY ol.date DESC, ol."createdAt" DESC
+      LIMIT $${n}
+    `, [...params, Number(limit)])).rows;
 
-  if (publication) { where += ' AND j.publication = ?'; params.push(publication); }
-  if (status)      { where += ' AND ol.status = ?';      params.push(status); }
-  if (from)        { where += ' AND ol.date >= ?';        params.push(from); }
-  if (to)          { where += ' AND ol.date <= ?';        params.push(to); }
+    const publications = (await pool.query(`
+      SELECT DISTINCT j.publication
+      FROM outreach_logs ol
+      JOIN journalists j ON j.id = ol."journalistId"
+      ORDER BY j.publication
+    `)).rows.map((r: any) => r.publication);
 
-  const rows = db.prepare(`
-    SELECT
-      ol.*,
-      j.name        AS journalistName,
-      j.publication AS publication,
-      j.outreachStatus AS journalistStatus
-    FROM outreach_logs ol
-    JOIN journalists j ON j.id = ol.journalistId
-    WHERE ${where}
-    ORDER BY ol.date DESC, ol.createdAt DESC
-    LIMIT ?
-  `).all(...params, Number(limit));
-
-  // Return distinct publication list for filter dropdown
-  const publications = db.prepare(`
-    SELECT DISTINCT j.publication
-    FROM outreach_logs ol
-    JOIN journalists j ON j.id = ol.journalistId
-    ORDER BY j.publication
-  `).all().map((r: any) => r.publication);
-
-  res.json({ logs: rows, publications });
+    res.json({ logs: rows, publications });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/journalist/:journalistId', (req: Request, res: Response) => {
-  res.json(
-    db.prepare('SELECT * FROM outreach_logs WHERE journalistId = ? ORDER BY date DESC, createdAt DESC')
-      .all(req.params.journalistId)
-  );
+router.get('/journalist/:journalistId', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM outreach_logs WHERE "journalistId" = $1 ORDER BY date DESC, "createdAt" DESC',
+      [req.params.journalistId]
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post('/', (req: Request, res: Response) => {
-  const b = req.body;
-  const result = db.prepare(`
-    INSERT INTO outreach_logs (journalistId, date, channel, messageType, subjectLine, messageBody, response, status, nextStep)
-    VALUES (@journalistId, @date, @channel, @messageType, @subjectLine, @messageBody, @response, @status, @nextStep)
-  `).run(b);
-
-  const created = db.prepare('SELECT * FROM outreach_logs WHERE id = ?').get(result.lastInsertRowid);
-  syncJournalistStatus(Number(b.journalistId));
-  res.status(201).json(created);
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const b = req.body;
+    const result = await pool.query(`
+      INSERT INTO outreach_logs ("journalistId", date, channel, "messageType", "subjectLine", "messageBody", response, status, "nextStep")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id
+    `, [b.journalistId, b.date, b.channel, b.messageType, b.subjectLine, b.messageBody, b.response, b.status, b.nextStep]);
+    const created = (await pool.query('SELECT * FROM outreach_logs WHERE id = $1', [result.rows[0].id])).rows[0];
+    await syncJournalistStatus(Number(b.journalistId));
+    res.status(201).json(created);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.put('/:id', (req: Request, res: Response) => {
-  const b = req.body;
-  db.prepare(`
-    UPDATE outreach_logs SET date=@date, channel=@channel, messageType=@messageType,
-    subjectLine=@subjectLine, messageBody=@messageBody, response=@response,
-    status=@status, nextStep=@nextStep, updatedAt=datetime('now') WHERE id=@id
-  `).run({ ...b, id: req.params.id });
-
-  const updated = db.prepare('SELECT * FROM outreach_logs WHERE id = ?').get(req.params.id) as any;
-  if (updated) syncJournalistStatus(Number(updated.journalistId));
-  res.json(updated);
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const b = req.body;
+    await pool.query(`
+      UPDATE outreach_logs SET date=$1, channel=$2, "messageType"=$3,
+      "subjectLine"=$4, "messageBody"=$5, response=$6,
+      status=$7, "nextStep"=$8, "updatedAt"=NOW() WHERE id=$9
+    `, [b.date, b.channel, b.messageType, b.subjectLine, b.messageBody, b.response, b.status, b.nextStep, req.params.id]);
+    const updated = (await pool.query('SELECT * FROM outreach_logs WHERE id = $1', [req.params.id])).rows[0];
+    if (updated) await syncJournalistStatus(Number(updated.journalistId));
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.delete('/:id', (req: Request, res: Response) => {
-  const log = db.prepare('SELECT journalistId FROM outreach_logs WHERE id = ?').get(req.params.id) as any;
-  db.prepare('DELETE FROM outreach_logs WHERE id = ?').run(req.params.id);
-  if (log) syncJournalistStatus(Number(log.journalistId));
-  res.json({ success: true });
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const log = (await pool.query('SELECT "journalistId" FROM outreach_logs WHERE id = $1', [req.params.id])).rows[0];
+    await pool.query('DELETE FROM outreach_logs WHERE id = $1', [req.params.id]);
+    if (log) await syncJournalistStatus(Number(log.journalistId));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;
