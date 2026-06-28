@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>North Star Media & Journalist Dossiers — System Overview</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --indigo-50:  #eef2ff;
+    --indigo-100: #e0e7ff;
+    --indigo-200: #c7d2fe;
+    --indigo-400: #818cf8;
+    --indigo-500: #6366f1;
+    --indigo-600: #4f46e5;
+    --indigo-700: #4338ca;
+    --indigo-900: #312e81;
+    --slate-50:   #f8fafc;
+    --slate-100:  #f1f5f9;
+    --slate-200:  #e2e8f0;
+    --slate-300:  #cbd5e1;
+    --slate-400:  #94a3b8;
+    --slate-500:  #64748b;
+    --slate-600:  #475569;
+    --slate-700:  #334155;
+    --slate-800:  #1e293b;
+    --slate-900:  #0f172a;
+    --amber-400:  #fbbf24;
+    --emerald-400: #34d399;
+    --emerald-500: #10b981;
+    --rose-400:   #fb7185;
+    --violet-400: #a78bfa;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: #000;
+    color: var(--slate-800);
+    overflow: hidden;
+  }
+
+  /* ── Deck container ─────────────────────────────────────────── */
+  #deck {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 56px 72px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    overflow: hidden;
+  }
+  .slide.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  /* ── Slide themes ───────────────────────────────────────────── */
+  .theme-cover {
+    background: linear-gradient(135deg, var(--indigo-900) 0%, #1a1060 50%, var(--slate-900) 100%);
+    color: white;
+    text-align: center;
+  }
+  .theme-section {
+    background: linear-gradient(135deg, var(--indigo-700) 0%, var(--indigo-900) 100%);
+    color: white;
+    text-align: center;
+  }
+  .theme-light {
+    background: var(--slate-50);
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  .theme-dark {
+    background: var(--slate-900);
+    color: white;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  .theme-split {
+    background: white;
+    flex-direction: row;
+    align-items: stretch;
+    padding: 0;
+    gap: 0;
+  }
+  .theme-end {
+    background: linear-gradient(135deg, var(--slate-900) 0%, var(--indigo-900) 100%);
+    color: white;
+    text-align: center;
+  }
+
+  /* ── Typography ─────────────────────────────────────────────── */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-bottom: 12px;
+  }
+  h1.hero {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+  }
+  h1.hero span { color: var(--indigo-400); }
+  h2.page-title {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+    line-height: 1.1;
+  }
+  h3.section-num {
+    font-size: 72px;
+    font-weight: 900;
+    opacity: 0.12;
+    line-height: 1;
+    margin-bottom: 8px;
+    letter-spacing: -0.04em;
+  }
+  h3.section-label {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  .subtitle {
+    font-size: 18px;
+    opacity: 0.7;
+    max-width: 600px;
+    line-height: 1.6;
+  }
+  .lead {
+    font-size: 17px;
+    line-height: 1.7;
+    color: var(--slate-600);
+    max-width: 780px;
+    margin-bottom: 28px;
+  }
+  .lead strong { color: var(--slate-800); }
+
+  /* ── Nav dots ───────────────────────────────────────────────── */
+  #nav {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 100;
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .dot.active { background: white; transform: scale(1.4); }
+
+  #counter {
+    position: fixed;
+    bottom: 28px;
+    right: 36px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    z-index: 100;
+  }
+
+  #prev, #next {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: white;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    transition: background 0.2s;
+  }
+  #prev:hover, #next:hover { background: rgba(255,255,255,0.25); }
+  #prev { left: 16px; }
+  #next { right: 16px; }
+
+  /* ── Card grid ──────────────────────────────────────────────── */
+  .card-grid {
+    display: grid;
+    gap: 16px;
+    width: 100%;
+    max-width: 900px;
+  }
+  .card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+  .card-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 22px;
+    border: 1.5px solid var(--slate-200);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .card-dark {
+    background: var(--slate-800);
+    border-color: var(--slate-700);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .card-icon {
+    font-size: 26px;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--slate-800);
+  }
+  .card-dark .card-title { color: white; }
+  .card-body {
+    font-size: 13px;
+    color: var(--slate-500);
+    line-height: 1.55;
+  }
+  .card-dark .card-body { color: var(--slate-400); }
+  .card-accent { border-left: 3px solid var(--indigo-500); }
+
+  /* ── Badge / pill ───────────────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-indigo { background: var(--indigo-100); color: var(--indigo-700); }
+  .badge-green  { background: #dcfce7; color: #15803d; }
+  .badge-amber  { background: #fef3c7; color: #b45309; }
+  .badge-gray   { background: var(--slate-100); color: var(--slate-600); }
+  .badge-violet { background: #f5f3ff; color: #6d28d9; }
+  .badge-rose   { background: #ffe4e6; color: #be123c; }
+  .badge-white  { background: rgba(255,255,255,0.15); color: white; }
+
+  /* ── Table ──────────────────────────────────────────────────── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  .data-table th {
+    text-align: left;
+    padding: 9px 14px;
+    background: var(--slate-100);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--slate-500);
+    border-bottom: 1.5px solid var(--slate-200);
+  }
+  .data-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--slate-100);
+    color: var(--slate-700);
+    vertical-align: top;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--slate-50); }
+  td.label { font-weight: 600; color: var(--slate-800); white-space: nowrap; }
+
+  /* ── Score bar ──────────────────────────────────────────────── */
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .score-label { font-size: 13px; width: 180px; color: var(--slate-700); flex-shrink: 0; }
+  .score-bar-bg { flex: 1; height: 8px; background: var(--slate-100); border-radius: 99px; }
+  .score-bar-fill { height: 8px; border-radius: 99px; background: var(--indigo-500); }
+  .score-max { font-size: 12px; color: var(--slate-400); width: 30px; text-align: right; flex-shrink: 0; }
+
+  /* ── Flow / pipeline ────────────────────────────────────────── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: nowrap;
+  }
+  .flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 1;
+  }
+  .flow-bubble {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--indigo-500);
+    color: white;
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 12px rgba(99,102,241,0.35);
+  }
+  .flow-step-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--slate-700);
+    margin-bottom: 3px;
+  }
+  .flow-step-sub {
+    font-size: 11px;
+    color: var(--slate-400);
+    max-width: 90px;
+  }
+  .flow-arrow {
+    font-size: 18px;
+    color: var(--slate-300);
+    margin: 0 4px;
+    padding-bottom: 28px;
+    flex-shrink: 0;
+  }
+
+  /* ── Split slide layout ─────────────────────────────────────── */
+  .split-left {
+    flex: 0 0 42%;
+    background: linear-gradient(160deg, var(--indigo-900) 0%, var(--slate-900) 100%);
+    color: white;
+    padding: 56px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .split-right {
+    flex: 1;
+    background: white;
+    padding: 48px 52px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-y: auto;
+  }
+
+  /* ── Principles list ────────────────────────────────────────── */
+  .principle-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--slate-100);
+  }
+  .principle-row:last-child { border-bottom: none; }
+  .principle-icon {
+    font-size: 18px;
+    width: 32px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .principle-text { font-size: 14px; color: var(--slate-700); line-height: 1.55; }
+  .principle-text strong { color: var(--slate-900); display: block; font-size: 13.5px; margin-bottom: 2px; }
+
+  /* ── Tier cards ─────────────────────────────────────────────── */
+  .tier-card {
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .tier-a { background: linear-gradient(135deg, #fef3c7, #fde68a); border-left: 4px solid #d97706; }
+  .tier-b { background: linear-gradient(135deg, #dbeafe, #bfdbfe); border-left: 4px solid #2563eb; }
+  .tier-c { background: linear-gradient(135deg, #dcfce7, #bbf7d0); border-left: 4px solid #16a34a; }
+  .tier-letter {
+    font-size: 28px;
+    font-weight: 900;
+    opacity: 0.25;
+    float: right;
+    margin-top: -4px;
+  }
+  .tier-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: var(--slate-900); }
+  .tier-desc { font-size: 12.5px; color: var(--slate-600); margin-bottom: 6px; }
+  .tier-eg   { font-size: 11.5px; color: var(--slate-500); font-style: italic; }
+
+  /* ── Cron schedule ──────────────────────────────────────────── */
+  .cron-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    background: var(--slate-800);
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+  .cron-time {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--indigo-400);
+    width: 120px;
+    flex-shrink: 0;
+  }
+  .cron-label { font-size: 14px; color: white; font-weight: 600; flex: 1; }
+  .cron-desc { font-size: 12px; color: var(--slate-400); }
+
+  /* ── Roadmap ────────────────────────────────────────────────── */
+  .roadmap-phase {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 18px;
+    align-items: flex-start;
+  }
+  .roadmap-marker {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .roadmap-marker.now  { background: var(--indigo-500); color: white; }
+  .roadmap-marker.next { background: var(--amber-400); color: white; }
+  .roadmap-marker.later{ background: var(--slate-200); color: var(--slate-600); }
+  .roadmap-phase-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; color: var(--slate-800); }
+  .roadmap-phase-items { font-size: 13px; color: var(--slate-500); line-height: 1.7; }
+
+  /* ── Misc utils ─────────────────────────────────────────────── */
+  .w-full { width: 100%; }
+  .max-w { max-width: 880px; width: 100%; }
+  .mt-2 { margin-top: 8px; }
+  .mt-3 { margin-top: 14px; }
+  .mt-4 { margin-top: 20px; }
+  .mb-1 { margin-bottom: 6px; }
+  .mb-2 { margin-bottom: 12px; }
+  .mb-3 { margin-bottom: 20px; }
+  .tag-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+  .slide-header {
+    width: 100%;
+    max-width: 900px;
+    padding-bottom: 16px;
+    margin-bottom: 22px;
+    border-bottom: 2px solid var(--slate-200);
+  }
+  .slide-header .eyebrow { color: var(--indigo-500); }
+  .slide-header h2 { color: var(--slate-900); }
+
+  .dark .slide-header { border-bottom-color: var(--slate-700); }
+  .dark .slide-header h2 { color: white; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .pipeline-box {
+    background: var(--slate-800);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .pipeline-step-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--indigo-500);
+    color: white;
+    font-size: 12px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .pipeline-step-content { flex: 1; }
+  .pipeline-step-title { font-size: 13.5px; font-weight: 700; color: white; margin-bottom: 2px; }
+  .pipeline-step-desc { font-size: 12px; color: var(--slate-400); line-height: 1.5; }
+
+  .score-band {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+  .band-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .band-label { font-size: 14px; font-weight: 700; }
+  .band-desc { font-size: 13px; opacity: 0.75; }
+
+  .tag {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    background: var(--indigo-100);
+    color: var(--indigo-700);
+    margin: 2px;
+  }
+
+  .stat-big {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    border: 1.5px solid var(--slate-200);
+  }
+  .stat-big .num { font-size: 42px; font-weight: 900; color: var(--indigo-600); letter-spacing: -0.03em; }
+  .stat-big .lbl { font-size: 12px; color: var(--slate-500); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+  .arch-layer {
+    background: var(--slate-800);
+    border: 1.5px solid var(--slate-700);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    width: 100%;
+    max-width: 700px;
+  }
+  .arch-layer-name {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--indigo-400); margin-bottom: 6px;
+  }
+  .arch-layer-tech { font-size: 13px; color: var(--slate-300); }
+  .arch-layer-tech span { color: white; font-weight: 600; }
+
+  .no-break { white-space: nowrap; }
+
+  @media (max-width: 900px) {
+    .slide { padding: 32px 28px; }
+    h1.hero { font-size: 34px; }
+    h2.page-title { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 1 — COVER
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-cover active">
+  <div class="eyebrow" style="color:var(--indigo-400)">North Star AI Labs — Internal Tools</div>
+  <h1 class="hero">Media &amp; Journalist<br><span>Dossier System</span></h1>
+  <p class="subtitle">How we discover, evaluate, and build relationships<br>with the journalists who cover AI</p>
+  <div class="tag-row" style="justify-content:center;margin-top:32px">
+    <span class="badge badge-white">MVP v1.4</span>
+    <span class="badge badge-white">June 2026</span>
+    <span class="badge badge-white">Journalist CRM</span>
+    <span class="badge badge-white">AI-Assisted</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 2 — THE PROBLEM
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Why we built this</div>
+    <h2 class="page-title">The Problem We're Solving</h2>
+  </div>
+  <div class="max-w">
+    <p class="lead">Getting covered by the right journalists is one of the highest-leverage activities for an early-stage AI startup. But the process of <strong>finding, researching, and tracking journalists</strong> is fragmented across spreadsheets, emails, and guesswork.</p>
+    <div class="card-grid cols-3 mt-3">
+      <div class="card card-accent">
+        <span class="card-icon">🔍</span>
+        <div class="card-title">Discovery is manual and slow</div>
+        <div class="card-body">Finding journalists who actually cover AI — not just tech broadly — requires scanning dozens of publications by hand.</div>
+      </div>
+      <div class="card card-accent">
+        <span class="card-icon">📊</span>
+        <div class="card-title">No structured prioritisation</div>
+        <div class="card-body">Without scoring, all journalists feel equally important. We'd pitch everyone the same way, with mediocre results.</div>
+      </div>
+      <div class="card card-accent">
+        <span class="card-icon">🗂️</span>
+        <div class="card-title">Outreach isn't tracked</div>
+        <div class="card-body">When you've already pitched someone, when to follow up, and whether they ever replied — all lived in individual inboxes.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 3 — WHAT IT IS
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">System overview</div>
+    <h2 class="page-title">What It Is</h2>
+  </div>
+  <div class="max-w">
+    <p class="lead">A <strong>journalist CRM</strong> that combines automated discovery with human review. Automation handles the tedious parts — scanning RSS feeds, scoring relevance, suggesting new sources. <strong>Humans make every final decision.</strong></p>
+    <div class="card-grid cols-2 mt-3">
+      <div class="card">
+        <div class="card-title">🗞️ Publication registry</div>
+        <div class="card-body">A curated list of media sources, categorised by tier, with per-publication RSS feed management and automated health monitoring.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔎 Journalist discovery</div>
+        <div class="card-body">Automatically surfaces new journalists from RSS feeds and staff pages, scored for AI/startup relevance before you ever see them.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Journalist dossiers</div>
+        <div class="card-body">Rich records with scoring across 6 dimensions, article history, contact details, best pitch angles, and full outreach logs.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📬 Outreach tracking</div>
+        <div class="card-body">Every pitch, follow-up, and response logged in one place. Follow-up reminders built in. Status tracked from first contact to coverage.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 4 — ARCHITECTURE
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-dark">
+  <div class="slide-header max-w dark">
+    <div class="eyebrow" style="color:var(--indigo-400)">Technical architecture</div>
+    <h2 class="page-title" style="color:white">How It's Built</h2>
+  </div>
+  <div style="width:100%;max-width:800px">
+    <div class="arch-layer">
+      <div class="arch-layer-name">🖥️ Frontend (port 5173)</div>
+      <div class="arch-layer-tech"><span>React 18 + TypeScript + Vite</span> &nbsp;·&nbsp; Tailwind CSS &nbsp;·&nbsp; 7 pages: Dashboard, Journalists, Publications, Suggestions, Export</div>
+    </div>
+    <div style="text-align:center;color:var(--slate-600);margin:-2px 0;font-size:18px">↕ REST API (Axios)</div>
+    <div class="arch-layer">
+      <div class="arch-layer-name">⚙️ Backend (port 3001)</div>
+      <div class="arch-layer-tech"><span>Express + TypeScript + Node.js</span> &nbsp;·&nbsp; 8 route groups &nbsp;·&nbsp; 3 background cron jobs</div>
+    </div>
+    <div style="text-align:center;color:var(--slate-600);margin:-2px 0;font-size:18px">↕ better-sqlite3</div>
+    <div class="arch-layer">
+      <div class="arch-layer-name">🗄️ Database</div>
+      <div class="arch-layer-tech"><span>SQLite</span> &nbsp;·&nbsp; 7 tables: journalists, articles, outreach_logs, publications, publication_feeds, publication_suggestions, journalist_suggestions</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <div class="arch-layer" style="flex:1;margin-bottom:0">
+        <div class="arch-layer-name">🤖 AI</div>
+        <div class="arch-layer-tech"><span>Claude Opus 4.8</span><br>Adaptive thinking</div>
+      </div>
+      <div class="arch-layer" style="flex:1;margin-bottom:0">
+        <div class="arch-layer-name">📡 RSS</div>
+        <div class="arch-layer-tech"><span>rss-parser</span><br>+ cheerio + axios</div>
+      </div>
+      <div class="arch-layer" style="flex:1;margin-bottom:0">
+        <div class="arch-layer-name">⏰ Schedule</div>
+        <div class="arch-layer-tech"><span>node-cron</span><br>3 automated jobs</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 5 — SECTION: PUBLICATIONS
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-section">
+  <h3 class="section-num">01</h3>
+  <h3 class="section-label">Publication Management</h3>
+  <p class="subtitle">How we source, classify, and maintain our media list</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 6 — TIER SYSTEM
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-split">
+  <div class="split-left">
+    <div class="eyebrow" style="color:var(--indigo-400)">Publication management</div>
+    <h2 class="page-title" style="color:white;margin-bottom:14px">3-Tier<br>Classification</h2>
+    <p style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.7">Every publication is classified as A, B, or C. Tier drives how we prioritise journalists and which publications we focus on first. <strong style="color:white">Tier C is not lower priority — it's more targeted.</strong></p>
+    <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,0.7)"><span style="font-size:18px">🏆</span>Tier A → Personalised, high-effort pitch</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,0.7)"><span style="font-size:18px">📰</span>Tier B → Tailored pitch with relevant angle</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,0.7)"><span style="font-size:18px">📍</span>Tier C → Targeted niche/local outreach</div>
+    </div>
+  </div>
+  <div class="split-right">
+    <div class="tier-card tier-a">
+      <span class="tier-letter">A</span>
+      <div class="tier-name">Tier A — Major Tech &amp; AI</div>
+      <div class="tier-desc">Large-audience national publications with AI as a primary editorial focus. High domain authority, broad reach across investors, journalists, hires, and customers.</div>
+      <div class="tier-eg">TechCrunch · Wired · MIT Technology Review · The Verge · VentureBeat · Ars Technica</div>
+    </div>
+    <div class="tier-card tier-b">
+      <span class="tier-letter">B</span>
+      <div class="tier-name">Tier B — Business &amp; Mid-Tier</div>
+      <div class="tier-desc">Business publications with a dedicated tech or AI desk. Audience skews toward executives and decision-makers. Less technical, more business/strategy focus.</div>
+      <div class="tier-eg">Forbes Technology · Fortune Tech · Fast Company · Inc. · Bloomberg Technology · WSJ Tech</div>
+    </div>
+    <div class="tier-card tier-c">
+      <span class="tier-letter">C</span>
+      <div class="tier-name">Tier C — Regional &amp; Niche</div>
+      <div class="tier-desc">Regional outlets (especially Southeast US), AI-specific newsletters, and emerging verticals. Smaller but highly targeted audiences — often generates more relevant local buzz.</div>
+      <div class="tier-eg">Hypepotamus · Atlanta Business Chronicle · AJC · GeekWire · AI Newsletters</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 7 — HOW PUBLICATIONS ARE SOURCED
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Publication sourcing</div>
+    <h2 class="page-title">3 Ways We Find New Publications</h2>
+  </div>
+  <div class="card-grid cols-3 max-w">
+    <div class="card">
+      <span class="card-icon">🤖</span>
+      <div class="card-title">Claude AI — Weekly (Mon 8am)</div>
+      <div class="card-body">Claude Opus 4.8 reviews our current list and suggests up to 5 new publications each Monday. It knows our tier definitions, mission, and what we already track — so suggestions are genuinely additive, not repeats.
+        <div class="tag-row mt-2"><span class="badge badge-indigo">Auto-deduplicated</span><span class="badge badge-gray">Human approval required</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <span class="card-icon">📦</span>
+      <div class="card-title">OPML Import — Bulk</div>
+      <div class="card-body">Import entire RSS feed libraries from Feedspot, Feedly, Inoreader, or any RSS reader. The system cross-checks against existing publications and routes new ones to the approval queue.
+        <div class="tag-row mt-2"><span class="badge badge-indigo">Tier auto-detected</span><span class="badge badge-gray">Human approval required</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <span class="card-icon">✍️</span>
+      <div class="card-title">Manual Add — One-off</div>
+      <div class="card-body">Add a single publication directly. RSS feed URL is optional — leave it blank and the system auto-discovers RSS via HTML link tags and 8 common feed path patterns.
+        <div class="tag-row mt-2"><span class="badge badge-green">Added immediately</span><span class="badge badge-gray">RSS auto-discovered</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="max-w mt-4" style="background:var(--indigo-50);border-radius:10px;padding:14px 18px;border-left:3px solid var(--indigo-500)">
+    <span style="font-size:13px;color:var(--indigo-800)"><strong>Google News virtual publications</strong> — 3 pre-seeded search feeds (AI Startups, Atlanta Tech, Generative AI) participate in journalist discovery like real publications, with no homepage to manage.</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 8 — RSS FEED REGISTRY
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Publication management</div>
+    <h2 class="page-title">Category Feed Discovery</h2>
+  </div>
+  <div class="max-w">
+    <p class="lead">Each publication can have <strong>multiple RSS feeds</strong>. A main feed + per-topic category feeds. Category feeds produce dramatically higher-quality journalist suggestions by filtering out off-topic content.</p>
+    <div class="two-col">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--slate-600);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Why it matters</div>
+        <div class="pipeline-box" style="background:var(--slate-100);border:1.5px solid var(--slate-200)">
+          <div style="font-size:22px">📰</div>
+          <div>
+            <div class="pipeline-step-title" style="color:var(--slate-800)">Main feed — noisy</div>
+            <div class="pipeline-step-desc" style="color:var(--slate-500)">The Verge main feed: gadgets, gaming, entertainment, films, AND AI. Most articles are irrelevant.</div>
+          </div>
+        </div>
+        <div class="pipeline-box" style="background:var(--indigo-50);border:1.5px solid var(--indigo-200)">
+          <div style="font-size:22px">🎯</div>
+          <div>
+            <div class="pipeline-step-title" style="color:var(--indigo-900)">Category feed — signal</div>
+            <div class="pipeline-step-desc" style="color:var(--indigo-700)">The Verge /ai-artificial-intelligence feed: <em>only</em> AI articles. Every byline is a candidate.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--slate-600);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Auto-discovery (⚡ button)</div>
+        <table class="data-table" style="font-size:12px">
+          <thead><tr><th>Publication</th><th>Category Feed URL</th></tr></thead>
+          <tbody>
+            <tr><td class="label">The Verge</td><td>/ai-artificial-intelligence/rss/index.xml</td></tr>
+            <tr><td class="label">TechCrunch</td><td>/category/artificial-intelligence/feed/</td></tr>
+            <tr><td class="label">Ars Technica</td><td>/ai/feed</td></tr>
+            <tr><td class="label">Wired</td><td>/feed/tag/artificial-intelligence/rss</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:12px;font-size:12px;color:var(--slate-500)">Discovery scans the homepage for AI/startup/tech keyword links, then probes 10 RSS suffix patterns for each. Takes ~20 seconds per publication.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 9 — SECTION: JOURNALIST DISCOVERY
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-section">
+  <h3 class="section-num">02</h3>
+  <h3 class="section-label">Journalist Discovery</h3>
+  <p class="subtitle">How we find journalists automatically and filter for relevance</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 10 — DISCOVERY PIPELINE
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-dark">
+  <div class="slide-header max-w dark">
+    <div class="eyebrow" style="color:var(--indigo-400)">Journalist sourcing</div>
+    <h2 class="page-title" style="color:white">The Discovery Pipeline</h2>
+  </div>
+  <div style="width:100%;max-width:860px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--indigo-400);margin-bottom:8px">Method 1 — RSS Scan (Wed 7am, automatic)</div>
+        <div class="pipeline-box"><div class="pipeline-step-num">1</div><div class="pipeline-step-content"><div class="pipeline-step-title">Fetch all feeds</div><div class="pipeline-step-desc">Main + all category feeds for every active publication</div></div></div>
+        <div class="pipeline-box"><div class="pipeline-step-num">2</div><div class="pipeline-step-content"><div class="pipeline-step-title">Extract bylines</div><div class="pipeline-step-desc">Parse author names from dc:creator, author fields. Strip email prefixes, filter student bylines</div></div></div>
+        <div class="pipeline-box"><div class="pipeline-step-num">3</div><div class="pipeline-step-content"><div class="pipeline-step-title">Collect articles</div><div class="pipeline-step-desc">Up to 10 articles per author from the last 90 days</div></div></div>
+        <div class="pipeline-box"><div class="pipeline-step-num">4</div><div class="pipeline-step-content"><div class="pipeline-step-title">Score relevance (0–10)</div><div class="pipeline-step-desc">Category tags + title keywords across all articles. Best article surfaced as evidence.</div></div></div>
+        <div class="pipeline-box"><div class="pipeline-step-num">5</div><div class="pipeline-step-content"><div class="pipeline-step-title">Deduplicate &amp; queue</div><div class="pipeline-step-desc">Skip if already in DB, pending, or rejected in last 30 days</div></div></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--violet-400);margin-bottom:8px">Method 2 — Staff Page Scan (on-demand)</div>
+        <div class="pipeline-box" style="border-left:2px solid var(--violet-400)"><div class="pipeline-step-num" style="background:var(--violet-400)">1</div><div class="pipeline-step-content"><div class="pipeline-step-title">Probe author paths</div><div class="pipeline-step-desc">Tries /authors, /staff, /team, /contributors, /reporters, /people and more</div></div></div>
+        <div class="pipeline-box" style="border-left:2px solid var(--violet-400)"><div class="pipeline-step-num" style="background:var(--violet-400)">2</div><div class="pipeline-step-content"><div class="pipeline-step-title">Extract names</div><div class="pipeline-step-desc">Anchor text, CSS class patterns, JSON-LD structured data</div></div></div>
+        <div class="pipeline-box" style="border-left:2px solid var(--violet-400)"><div class="pipeline-step-num" style="background:var(--violet-400)">3</div><div class="pipeline-step-content"><div class="pipeline-step-title">Add to queue</div><div class="pipeline-step-desc">Catches journalists who haven't published recently — won't appear in RSS</div></div></div>
+        <div style="padding:12px 14px;background:rgba(167,139,250,0.1);border-radius:8px;border:1px solid rgba(167,139,250,0.25);margin-top:4px">
+          <div style="font-size:12px;color:var(--slate-400)">⚠️ Limitation: only works on server-rendered HTML. JS-rendered pages return empty results. Firecrawl is the upgrade path.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 11 — RELEVANCE SCORING
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Journalist discovery</div>
+    <h2 class="page-title">Relevance Scoring (0 – 10)</h2>
+  </div>
+  <div class="two-col max-w">
+    <div>
+      <div style="font-size:13px;font-weight:700;color:var(--slate-600);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Two scoring signals</div>
+      <table class="data-table mb-3">
+        <thead><tr><th>Signal</th><th>Points</th></tr></thead>
+        <tbody>
+          <tr><td>AI tag (ai, llm, openai, anthropic…)</td><td class="label" style="color:var(--emerald-500)">+3 per article</td></tr>
+          <tr><td>Startup tag (funding, VC, series A…)</td><td class="label" style="color:var(--emerald-500)">+3 per article</td></tr>
+          <tr><td>AI title keyword ("AI", "LLM", "Claude"…)</td><td class="label" style="color:var(--emerald-500)">+2 per article</td></tr>
+          <tr><td>Startup title keyword ("raises", "Series A"…)</td><td class="label" style="color:var(--emerald-500)">+2 per article</td></tr>
+          <tr><td>No categories → title weight boost</td><td class="label" style="color:var(--indigo-500)">×1.5</td></tr>
+          <tr><td>Noise tag/keyword (gaming, sports, deals…)</td><td class="label" style="color:var(--rose-400)">−2 per article</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:12px;color:var(--slate-500)">Scored across up to 10 recent articles. Total clamped to 0–10. The <strong>highest-scoring article</strong> is surfaced as evidence — not the most recent.</div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:700;color:var(--slate-600);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Score bands in the review queue</div>
+      <div class="score-band" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
+        <div class="band-dot" style="background:#16a34a"></div>
+        <div>
+          <div class="band-label" style="color:#15803d">🟢 High — score 6–10</div>
+          <div class="band-desc" style="color:#166534">Strong AI/startup coverage. Likely worth adding.</div>
+        </div>
+      </div>
+      <div class="score-band" style="background:#fffbeb;border:1.5px solid #fde68a">
+        <div class="band-dot" style="background:#d97706"></div>
+        <div>
+          <div class="band-label" style="color:#b45309">🟡 Mid — score 3–5</div>
+          <div class="band-desc" style="color:#92400e">Mixed signal. Review their best article before deciding.</div>
+        </div>
+      </div>
+      <div class="score-band" style="background:var(--slate-100);border:1.5px solid var(--slate-200)">
+        <div class="band-dot" style="background:var(--slate-400)"></div>
+        <div>
+          <div class="band-label" style="color:var(--slate-600)">⚪ Low — score 0–2</div>
+          <div class="band-desc" style="color:var(--slate-500)">Little to no AI/startup coverage. Bulk-skip with one click.</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:12px 14px;background:var(--indigo-50);border-radius:8px;border-left:3px solid var(--indigo-400)">
+        <div style="font-size:12.5px;color:var(--indigo-800)"><strong>Example matched tags visible in the queue:</strong><br>
+          <span class="tag">anthropic</span><span class="tag">ai agents</span><span class="tag">startups</span><span class="tag">series a</span><span class="tag">llm</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 12 — REVIEW QUEUE
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Journalist discovery</div>
+    <h2 class="page-title">The Review Queue</h2>
+  </div>
+  <div class="max-w">
+    <p class="lead" style="margin-bottom:16px">All journalist suggestions go through a <strong>human review step</strong> — nothing is added automatically. The queue is sorted by relevance score, highest first.</p>
+    <div class="two-col">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Each suggestion shows</div>
+        <div class="principle-row"><div class="principle-icon">👤</div><div class="principle-text"><strong>Name + article count</strong>How many articles were scanned to compute the score</div></div>
+        <div class="principle-row"><div class="principle-icon">🏷️</div><div class="principle-text"><strong>Relevance score badge</strong>Green/amber/grey based on 0–10 score</div></div>
+        <div class="principle-row"><div class="principle-icon">🔖</div><div class="principle-text"><strong>Matched tags</strong>Specific AI/startup tags that contributed to the score</div></div>
+        <div class="principle-row" style="border-bottom:none"><div class="principle-icon">📄</div><div class="principle-text"><strong>Best article (linked)</strong>The highest-scoring article as evidence — not the most recent</div></div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Actions available</div>
+        <div class="pipeline-box" style="background:var(--slate-100);border:1.5px solid var(--slate-200)">
+          <div style="font-size:20px">✅</div>
+          <div class="pipeline-step-content">
+            <div class="pipeline-step-title" style="color:var(--slate-800)">Accept</div>
+            <div class="pipeline-step-desc" style="color:var(--slate-500)">Creates a draft journalist record. Claude immediately runs in background → pre-fills beat, all 6 scores, tier, and best pitch angle.</div>
+          </div>
+        </div>
+        <div class="pipeline-box" style="background:var(--slate-100);border:1.5px solid var(--slate-200)">
+          <div style="font-size:20px">⏭️</div>
+          <div class="pipeline-step-content">
+            <div class="pipeline-step-title" style="color:var(--slate-800)">Skip</div>
+            <div class="pipeline-step-desc" style="color:var(--slate-500)">Archives the suggestion. Won't resurface for 30 days (cooldown period).</div>
+          </div>
+        </div>
+        <div class="pipeline-box" style="background:var(--slate-100);border:1.5px solid var(--slate-200)">
+          <div style="font-size:20px">🗑️</div>
+          <div class="pipeline-step-content">
+            <div class="pipeline-step-title" style="color:var(--slate-800)">Skip all low-signal</div>
+            <div class="pipeline-step-desc" style="color:var(--slate-500)">One-click bulk dismiss of all suggestions scoring &lt; 3 — clears noise fast.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 13 — SECTION: JOURNALIST RECORDS & SCORING
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-section">
+  <h3 class="section-num">03</h3>
+  <h3 class="section-label">Journalist Records &amp; Scoring</h3>
+  <p class="subtitle">How we evaluate and prioritise journalists with AI-assisted scoring</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 14 — CLAUDE AUTO-SCORING
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-dark">
+  <div class="slide-header max-w dark">
+    <div class="eyebrow" style="color:var(--indigo-400)">Journalist records</div>
+    <h2 class="page-title" style="color:white">Claude Auto-Scoring on Accept</h2>
+  </div>
+  <div class="max-w">
+    <p style="font-size:15px;color:var(--slate-400);margin-bottom:20px;max-width:680px;line-height:1.7">When you accept a journalist, <strong style="color:white">Claude Opus 4.8 runs in the background</strong> and pre-fills the journalist's full profile. Scores are suggestions — always review before acting.</p>
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate-500);margin-bottom:10px">Claude's inputs</div>
+        <div class="pipeline-box"><div style="font-size:16px">👤</div><div class="pipeline-step-content"><div class="pipeline-step-title">Journalist name + publication</div><div class="pipeline-step-desc">Full context about the media source and tier</div></div></div>
+        <div class="pipeline-box"><div style="font-size:16px">📰</div><div class="pipeline-step-content"><div class="pipeline-step-title">Recent article title + URL</div><div class="pipeline-step-desc">The best-scoring article from the RSS scan</div></div></div>
+        <div class="pipeline-box"><div style="font-size:16px">🏷️</div><div class="pipeline-step-content"><div class="pipeline-step-title">Suggested beat</div><div class="pipeline-step-desc">Inferred from matched tags during RSS scoring</div></div></div>
+      </div>
+      <div style="font-size:28px;color:var(--slate-600);padding-top:60px">→</div>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate-500);margin-bottom:10px">Claude's outputs</div>
+        <div class="pipeline-box" style="border-left:2px solid var(--emerald-400)"><div style="font-size:16px">✨</div><div class="pipeline-step-content"><div class="pipeline-step-title">Refined beat description</div><div class="pipeline-step-desc">More precise than the RSS inference</div></div></div>
+        <div class="pipeline-box" style="border-left:2px solid var(--emerald-400)"><div style="font-size:16px">📊</div><div class="pipeline-step-content"><div class="pipeline-step-title">All 6 dimension scores</div><div class="pipeline-step-desc">AI relevance, startup fit, North Star fit, publication authority, audience reach, contactability</div></div></div>
+        <div class="pipeline-box" style="border-left:2px solid var(--emerald-400)"><div style="font-size:16px">🎯</div><div class="pipeline-step-content"><div class="pipeline-step-title">Best pitch angle</div><div class="pipeline-step-desc">A suggested framing based on the journalist's recent work</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 15 — SCORING DIMENSIONS
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Journalist records</div>
+    <h2 class="page-title">Composite Score — 100 Points</h2>
+  </div>
+  <div class="max-w">
+    <div class="two-col">
+      <div>
+        <div class="score-row"><div class="score-label">🤖 AI Relevance</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:100%"></div></div><div class="score-max">/ 25</div></div>
+        <div class="score-row"><div class="score-label">🚀 Startup Relevance</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:80%"></div></div><div class="score-max">/ 20</div></div>
+        <div class="score-row"><div class="score-label">⭐ North Star Fit</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:80%"></div></div><div class="score-max">/ 20</div></div>
+        <div class="score-row"><div class="score-label">📰 Publication Authority</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:60%"></div></div><div class="score-max">/ 15</div></div>
+        <div class="score-row"><div class="score-label">👥 Audience Reach</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:40%"></div></div><div class="score-max">/ 10</div></div>
+        <div class="score-row"><div class="score-label">📬 Contactability</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:40%"></div></div><div class="score-max">/ 10</div></div>
+      </div>
+      <div>
+        <table class="data-table">
+          <thead><tr><th>Tier</th><th>Score</th><th>Approach</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-violet">Tier 1</span></td>
+              <td class="label">80–100</td>
+              <td>Personalised, high-effort pitch</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-indigo">Tier 2</span></td>
+              <td class="label">60–79</td>
+              <td>Tailored pitch with relevant angle</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-gray">Tier 3</span></td>
+              <td class="label">40–59</td>
+              <td>Periodic news updates</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-gray">Tier 4</span></td>
+              <td class="label">&lt; 40</td>
+              <td>Monitor — add to press list only</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:14px;padding:12px 14px;background:var(--amber-400);background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:8px;border-left:3px solid #d97706">
+          <div style="font-size:12.5px;color:#7c2d12"><strong>Claude scores are starting points.</strong> Review before acting. The re-score button in the Journalists list page lets you re-run Claude analysis for any journalist with score 0.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 16 — SECTION: CONTACT DETAILS
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-section">
+  <h3 class="section-num">04</h3>
+  <h3 class="section-label">Contact Information</h3>
+  <p class="subtitle">How we gather contact details — and what we never do</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 17 — CONTACT GATHERING
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-split">
+  <div class="split-left">
+    <div class="eyebrow" style="color:var(--rose-400)">Strict policy</div>
+    <h2 class="page-title" style="color:white;margin-bottom:16px">What We Never Do</h2>
+    <div class="principle-row" style="border-bottom-color:rgba(255,255,255,0.1);padding:10px 0">
+      <div class="principle-icon">❌</div>
+      <div class="principle-text" style="color:rgba(255,255,255,0.75)"><strong style="color:white">Guess email addresses</strong>No "firstname.lastname@pub.com" pattern guessing without verified evidence</div>
+    </div>
+    <div class="principle-row" style="border-bottom-color:rgba(255,255,255,0.1);padding:10px 0">
+      <div class="principle-icon">❌</div>
+      <div class="principle-text" style="color:rgba(255,255,255,0.75)"><strong style="color:white">Purchase contact lists</strong>Data brokers, Apollo cold outreach, LinkedIn scraping</div>
+    </div>
+    <div class="principle-row" style="border-bottom-color:rgba(255,255,255,0.1);padding:10px 0">
+      <div class="principle-icon">❌</div>
+      <div class="principle-text" style="color:rgba(255,255,255,0.75)"><strong style="color:white">Scrape personal data</strong>Privacy violation, legal risk, damages sender reputation</div>
+    </div>
+    <div class="principle-row" style="border-bottom:none;padding:10px 0">
+      <div class="principle-icon">❌</div>
+      <div class="principle-text" style="color:rgba(255,255,255,0.75)"><strong style="color:white">Mass automated outreach</strong>Destroys journalist relationships at scale</div>
+    </div>
+  </div>
+  <div class="split-right">
+    <div class="eyebrow" style="color:var(--emerald-500)">Permitted approach</div>
+    <h2 class="page-title" style="margin-bottom:16px">Finding Contact Details</h2>
+    <div style="font-size:13px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Where to look (manually)</div>
+    <div class="principle-row"><div class="principle-icon">📄</div><div class="principle-text"><strong>Author page</strong>Most publications list a tip line or contact email directly on the author's profile page</div></div>
+    <div class="principle-row"><div class="principle-icon">🐦</div><div class="principle-text"><strong>Twitter/X bio</strong>Many journalists actively share: "Tips: name@techcrunch.com"</div></div>
+    <div class="principle-row"><div class="principle-icon">🔗</div><div class="principle-text"><strong>Publication tips page</strong>techcrunch.com/tips · wired.com/about/contact — often lists beat-specific contacts</div></div>
+    <div class="principle-row" style="border-bottom:none"><div class="principle-icon">✅</div><div class="principle-text"><strong>Verify before sending</strong>Use Hunter.io, NeverBounce, or ZeroBounce to confirm deliverability</div></div>
+    <div style="margin-top:14px;padding:12px 16px;background:var(--emerald-500);background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-radius:8px;border-left:3px solid #16a34a">
+      <div style="font-size:12.5px;color:#14532d"><strong>Future integration:</strong> Hunter.io ($49/mo) or Apollo.io (50 free/month) for email discovery — both have opt-out databases and respect professional contact preferences.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 18 — SECTION: OUTREACH & TRACKING
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-section">
+  <h3 class="section-num">05</h3>
+  <h3 class="section-label">Outreach &amp; Tracking</h3>
+  <p class="subtitle">How we pitch, follow up, and track every interaction</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 19 — OUTREACH CYCLE
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Outreach workflow</div>
+    <h2 class="page-title">The Outreach Cycle</h2>
+  </div>
+  <div class="max-w">
+    <div class="flow mt-2 mb-3">
+      <div class="flow-step"><div class="flow-bubble">🔍</div><div class="flow-step-label">Identify</div><div class="flow-step-sub">Accept from queue, score ≥ Tier 2</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="flow-bubble">📖</div><div class="flow-step-label">Research</div><div class="flow-step-sub">Read recent articles, note angles</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="flow-bubble">✍️</div><div class="flow-step-label">Pitch</div><div class="flow-step-sub">Personalised, human-written</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="flow-bubble">📬</div><div class="flow-step-label">Follow Up</div><div class="flow-step-sub">5–7 days, then 7–10 more</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="flow-bubble">💬</div><div class="flow-step-label">Respond</div><div class="flow-step-sub">Log reply, update status</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="flow-bubble">🔄</div><div class="flow-step-label">Maintain</div><div class="flow-step-sub">Re-verify every 60–90 days</div></div>
+    </div>
+    <div class="two-col">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">What we log per interaction</div>
+        <table class="data-table" style="font-size:12.5px">
+          <tbody>
+            <tr><td class="label">Message type</td><td>Email · LinkedIn · Twitter DM · Phone · In-person</td></tr>
+            <tr><td class="label">Subject line</td><td>Exact subject for reference</td></tr>
+            <tr><td class="label">Message body</td><td>The pitch text</td></tr>
+            <tr><td class="label">Status</td><td>Sent → Opened → Replied → Covered → Declined → No Response</td></tr>
+            <tr><td class="label">Follow-up date</td><td>Reminder for next check-in</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Follow-up rules</div>
+        <div class="principle-row"><div class="principle-icon">📅</div><div class="principle-text"><strong>First follow-up</strong>5–7 business days after initial pitch</div></div>
+        <div class="principle-row"><div class="principle-icon">📅</div><div class="principle-text"><strong>Second follow-up</strong>7–10 business days after first</div></div>
+        <div class="principle-row" style="border-bottom:none"><div class="principle-icon">🛑</div><div class="principle-text"><strong>Stop after 2</strong>Respect their inbox. A major news hook (new funding, launch) justifies fresh outreach after no-response.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 20 — OUTREACH STATUS + DASHBOARD
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Outreach workflow</div>
+    <h2 class="page-title">Status Tracking &amp; Dashboard</h2>
+  </div>
+  <div class="two-col max-w">
+    <div>
+      <div style="font-size:13px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Journalist outreach statuses</div>
+      <table class="data-table">
+        <tbody>
+          <tr><td><span class="badge badge-gray">Researching</span></td><td style="font-size:12.5px">Accepted from queue, Claude analysis done, not yet pitched</td></tr>
+          <tr><td><span class="badge badge-indigo">Ready to Pitch</span></td><td style="font-size:12.5px">Research complete, pitch drafted, ready to send</td></tr>
+          <tr><td><span class="badge badge-indigo">Pitched</span></td><td style="font-size:12.5px">Outreach sent, awaiting response</td></tr>
+          <tr><td><span class="badge badge-amber">Responded</span></td><td style="font-size:12.5px">Journalist replied</td></tr>
+          <tr><td><span class="badge badge-amber">In Conversation</span></td><td style="font-size:12.5px">Active discussion or interview scheduled</td></tr>
+          <tr><td><span class="badge badge-green">Covered</span></td><td style="font-size:12.5px">Story published</td></tr>
+          <tr><td><span class="badge badge-rose">Declined</span></td><td style="font-size:12.5px">Journalist explicitly passed — do not re-pitch</td></tr>
+          <tr><td><span class="badge badge-gray">On Hold</span></td><td style="font-size:12.5px">Paused — timing not right</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Dashboard surfaces</div>
+      <div class="principle-row"><div class="principle-icon">📊</div><div class="principle-text"><strong>Journalist count by tier</strong>How many Tier 1, 2, 3, 4 journalists we have</div></div>
+      <div class="principle-row"><div class="principle-icon">⏰</div><div class="principle-text"><strong>Follow-up queue</strong>Journalists where nextFollowUpDate has passed</div></div>
+      <div class="principle-row"><div class="principle-icon">📬</div><div class="principle-text"><strong>Recent outreach</strong>Last interactions logged across all journalists</div></div>
+      <div class="principle-row" style="border-bottom:none"><div class="principle-icon">⚠️</div><div class="principle-text"><strong>Stale flag alerts</strong>Records not updated in 90+ days (set automatically on 1st of month)</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 21 — SECTION: AUTOMATION
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-section">
+  <h3 class="section-num">06</h3>
+  <h3 class="section-label">Automation Schedule</h3>
+  <p class="subtitle">What runs automatically, when, and what requires a human</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 22 — CRON JOBS + WHAT'S HUMAN
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-dark">
+  <div class="slide-header max-w dark">
+    <div class="eyebrow" style="color:var(--indigo-400)">Automation</div>
+    <h2 class="page-title" style="color:white">What Runs Automatically</h2>
+  </div>
+  <div style="width:100%;max-width:860px">
+    <div class="cron-row">
+      <div class="cron-time">Mon 8:00am ET</div>
+      <div>
+        <div class="cron-label">🤖 Claude Publication Discovery</div>
+        <div class="cron-desc">Claude Opus 4.8 reviews current list → suggests up to 5 new publications → adds to review banner</div>
+      </div>
+    </div>
+    <div class="cron-row">
+      <div class="cron-time">Wed 7:00am ET</div>
+      <div>
+        <div class="cron-label">📡 RSS Journalist Discovery</div>
+        <div class="cron-desc">Scans all active feeds in publication_feeds → extracts bylines → scores 0–10 → deduplicates → adds to review queue</div>
+      </div>
+    </div>
+    <div class="cron-row">
+      <div class="cron-time">1st of month, 6am</div>
+      <div>
+        <div class="cron-label">🏥 Health Checks</div>
+        <div class="cron-desc">Pings all publication URLs (HEAD) · checks RSS staleness · flags journalist records not updated in 90+ days</div>
+      </div>
+    </div>
+    <div style="margin-top:18px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate-500);margin-bottom:10px">These always require a human</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div class="card-dark" style="border-left:2px solid var(--emerald-400)">
+          <div class="card-title">✅ Approving suggestions</div>
+          <div class="card-body">No publication or journalist is added automatically. Every suggestion waits in a queue for human review.</div>
+        </div>
+        <div class="card-dark" style="border-left:2px solid var(--emerald-400)">
+          <div class="card-title">✍️ All outreach</div>
+          <div class="card-body">Every pitch is human-written and human-sent. Claude helps with angle suggestions — it doesn't send anything.</div>
+        </div>
+        <div class="card-dark" style="border-left:2px solid var(--emerald-400)">
+          <div class="card-title">📧 Contact gathering</div>
+          <div class="card-body">Email addresses are entered manually from publicly available sources. No automated email harvesting.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 23 — SECTION: ROADMAP
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-section">
+  <h3 class="section-num">07</h3>
+  <h3 class="section-label">Roadmap</h3>
+  <p class="subtitle">Where this is heading — near-term improvements and future phases</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 24 — NEAR-TERM ROADMAP
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Roadmap</div>
+    <h2 class="page-title">Near-Term — No Additional Cost</h2>
+  </div>
+  <div class="max-w">
+    <div class="two-col">
+      <div>
+        <div class="roadmap-phase">
+          <div class="roadmap-marker now">✓</div>
+          <div>
+            <div class="roadmap-phase-title">Shipped (MVP v1.4)</div>
+            <div class="roadmap-phase-items">
+              Publication registry + tier system<br>
+              Category RSS feed discovery<br>
+              Weekly journalist discovery (RSS + staff pages)<br>
+              Relevance scoring (0–10) with tag evidence<br>
+              Claude auto-scoring on accept (6 dimensions)<br>
+              Bulk re-score button for existing journalists<br>
+              OPML import from Feedspot/Feedly<br>
+              Outreach log + follow-up tracking<br>
+              CSV/JSON export
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="roadmap-phase">
+          <div class="roadmap-marker next">→</div>
+          <div>
+            <div class="roadmap-phase-title">Next sprint</div>
+            <div class="roadmap-phase-items">
+              OPML accept → auto-carry RSS URL into record<br>
+              Bulk accept suggestions by tier/publication<br>
+              Re-scan suggestions after new category feeds added<br>
+              Per-journalist Claude research button ("brief me before I pitch")<br>
+              Pitch angle drafting (Claude reads 5 articles → suggests hook)
+            </div>
+          </div>
+        </div>
+        <div class="roadmap-phase" style="margin-top:6px">
+          <div class="roadmap-marker later">⋯</div>
+          <div>
+            <div class="roadmap-phase-title">Under consideration (paid)</div>
+            <div class="roadmap-phase-items">
+              Firecrawl — JS-rendered staff pages (~$15/mo)<br>
+              Hunter.io — email discovery + verification ($49/mo)<br>
+              Apollo.io — email discovery (50 free/month)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 25 — FUTURE PHASES
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-light">
+  <div class="slide-header max-w">
+    <div class="eyebrow">Roadmap</div>
+    <h2 class="page-title">Future Phases</h2>
+  </div>
+  <div class="card-grid cols-2 max-w">
+    <div class="card">
+      <span class="card-icon">🤖</span>
+      <div class="card-title">AI-Assisted Research &amp; Pitching</div>
+      <div class="card-body">
+        <strong>Journalist research button</strong> — Claude reads 5 recent articles, returns beat summary, pitch angle, red flags, and talking points before you decide to reach out.<br><br>
+        <strong>Pitch drafting</strong> — Claude reviews journalist's coverage and drafts a personalised first pitch for you to edit and send.<br><br>
+        <strong>Pitch quality checker</strong> — Claude reviews your draft before sending ("too generic", "wrong angle", "good to go").
+      </div>
+    </div>
+    <div class="card">
+      <span class="card-icon">📡</span>
+      <div class="card-title">Enrichment Integrations</div>
+      <div class="card-body">
+        <strong>Google News API</strong> — Auto-pull recent articles into the Articles tab for any journalist.<br><br>
+        <strong>Twitter/X API</strong> — Follower count, recent tweets (currently cost-prohibitive).
+      </div>
+    </div>
+    <div class="card">
+      <span class="card-icon">👥</span>
+      <div class="card-title">Team Collaboration</div>
+      <div class="card-body">
+        <strong>PostgreSQL migration</strong> — Multi-user access instead of single SQLite file.<br><br>
+        <strong>User accounts + roles</strong> — Who owns which journalist relationship.<br><br>
+        <strong>Shared outreach calendar</strong> — Detect when two people are pitching the same journalist simultaneously.
+      </div>
+    </div>
+    <div class="card">
+      <span class="card-icon">📊</span>
+      <div class="card-title">Analytics</div>
+      <div class="card-body">
+        <strong>Coverage tracking</strong> — Which pitches led to published stories.<br><br>
+        <strong>Journalist ROI</strong> — Time invested vs. coverage received per journalist.<br><br>
+        <strong>Discovery yield</strong> — How many accepted journalists per RSS scan, per publication, per tier.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 26 — ETHICS SUMMARY
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-dark">
+  <div class="slide-header max-w dark">
+    <div class="eyebrow" style="color:var(--emerald-400)">Non-negotiable principles</div>
+    <h2 class="page-title" style="color:white">Ethics &amp; Constraints</h2>
+  </div>
+  <div style="width:100%;max-width:860px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--rose-400);margin-bottom:8px">Never</div>
+        <div class="principle-row" style="border-bottom-color:var(--slate-700)"><div class="principle-icon">❌</div><div class="principle-text" style="color:var(--slate-300)"><strong style="color:white">Scrape personal contact data</strong>Privacy violation, legal risk, GDPR/CAN-SPAM exposure</div></div>
+        <div class="principle-row" style="border-bottom-color:var(--slate-700)"><div class="principle-icon">❌</div><div class="principle-text" style="color:var(--slate-300)"><strong style="color:white">Guess or purchase email lists</strong>Damages sender reputation; likely illegal</div></div>
+        <div class="principle-row" style="border-bottom-color:var(--slate-700)"><div class="principle-icon">❌</div><div class="principle-text" style="color:var(--slate-300)"><strong style="color:white">Mass automated outreach</strong>Destroys journalist relationships at scale</div></div>
+        <div class="principle-row" style="border-bottom:none"><div class="principle-icon">❌</div><div class="principle-text" style="color:var(--slate-300)"><strong style="color:white">Re-pitch after "Declined"</strong>Opt-outs are permanent — mark and respect</div></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--emerald-400);margin-bottom:8px">Always</div>
+        <div class="principle-row" style="border-bottom-color:var(--slate-700)"><div class="principle-icon">✅</div><div class="principle-text" style="color:var(--slate-300)"><strong style="color:white">Public professional contacts only</strong>Journalists share contact info specifically to receive pitches</div></div>
+        <div class="principle-row" style="border-bottom-color:var(--slate-700)"><div class="principle-icon">✅</div><div class="principle-text" style="color:var(--slate-300)"><strong style="color:white">Human-written, human-sent outreach</strong>Authenticity and personalisation are non-negotiable</div></div>
+        <div class="principle-row" style="border-bottom-color:var(--slate-700)"><div class="principle-icon">✅</div><div class="principle-text" style="color:var(--slate-300)"><strong style="color:white">Human approval for all additions</strong>Nothing added to the database automatically</div></div>
+        <div class="principle-row" style="border-bottom:none"><div class="principle-icon">✅</div><div class="principle-text" style="color:var(--slate-300)"><strong style="color:white">Read public pages only</strong>RSS feeds and staff pages exist to be read — no personal data harvested</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 27 — END
+═══════════════════════════════════════════════════════════════ -->
+<div class="slide theme-end">
+  <div class="eyebrow" style="color:var(--indigo-400)">North Star AI Labs</div>
+  <h1 class="hero" style="color:white;font-size:44px">Media &amp; Journalist<br><span>Dossier System</span></h1>
+  <p class="subtitle" style="color:rgba(255,255,255,0.6)">MVP v1.4 &nbsp;·&nbsp; Built with React, Express, SQLite, and Claude Opus 4.8</p>
+  <div class="tag-row" style="justify-content:center;margin-top:36px">
+    <span class="badge badge-white">📊 33 journalists tracked</span>
+    <span class="badge badge-white">📰 Multiple publications</span>
+    <span class="badge badge-white">🤖 AI-assisted scoring</span>
+    <span class="badge badge-white">✅ 100% human outreach</span>
+  </div>
+  <div style="margin-top:40px;font-size:13px;color:rgba(255,255,255,0.3)">Use ← → arrow keys or click the buttons to navigate</div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- Navigation -->
+<button id="prev" onclick="go(-1)">‹</button>
+<button id="next" onclick="go(1)">›</button>
+<div id="nav"></div>
+<div id="counter"></div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let current = 0;
+
+  const nav = document.getElementById('nav');
+  const counter = document.getElementById('counter');
+
+  // Build dots
+  slides.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.onclick = () => goTo(i);
+    nav.appendChild(d);
+  });
+
+  function goTo(n) {
+    slides[current].classList.remove('active');
+    document.querySelectorAll('.dot')[current].classList.remove('active');
+    current = Math.max(0, Math.min(slides.length - 1, n));
+    slides[current].classList.add('active');
+    document.querySelectorAll('.dot')[current].classList.add('active');
+    counter.textContent = (current + 1) + ' / ' + slides.length;
+  }
+
+  function go(delta) { goTo(current + delta); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); go(1); }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    { e.preventDefault(); go(-1); }
+  });
+
+  // Touch swipe
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+  });
+
+  goTo(0);
+</script>
+</body>
+</html>
