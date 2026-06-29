@@ -198,9 +198,34 @@ export async function initDb(): Promise<void> {
       ALTER TABLE publications ADD COLUMN IF NOT EXISTS "createdAt"        TIMESTAMPTZ DEFAULT NOW();
       ALTER TABLE publications ADD COLUMN IF NOT EXISTS "updatedAt"        TIMESTAMPTZ DEFAULT NOW();
 
-      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "staleFlag"         INTEGER DEFAULT 0;
-      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "isFavorite"        INTEGER DEFAULT 0;
-      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "lastArticleDate"   TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "roleTitle"                 TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS beat                       TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS location                   TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "publicationType"          TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "aiRelevanceScore"         INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "startupRelevanceScore"    INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "northStarFitScore"        INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "publicationAuthorityScore" INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "audienceReachScore"       INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "contactabilityScore"      INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "totalScore"               INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "priorityTier"             INTEGER DEFAULT 4;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS email                      TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "contactUrl"               TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "linkedinUrl"              TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "twitterUrl"               TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "personalWebsite"          TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "muckRackUrl"              TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "bestPitchAngle"           TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS notes                      TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "outreachStatus"           TEXT DEFAULT 'Not Started';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "lastContactedDate"        TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "nextFollowUpDate"         TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "staleFlag"                INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "isFavorite"               INTEGER DEFAULT 0;
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "lastArticleDate"          TEXT DEFAULT '';
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "createdAt"                TIMESTAMPTZ DEFAULT NOW();
+      ALTER TABLE journalists ADD COLUMN IF NOT EXISTS "updatedAt"                TIMESTAMPTZ DEFAULT NOW();
 
       ALTER TABLE campaign_journalists ADD COLUMN IF NOT EXISTS "sentAt"   TEXT DEFAULT '';
     `);
