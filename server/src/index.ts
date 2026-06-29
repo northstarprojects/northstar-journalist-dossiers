@@ -84,7 +84,7 @@ app.get('/api/dashboard', async (_req, res) => {
       pool.query("SELECT COUNT(*)::int as c FROM campaign_journalists WHERE \"draftStatus\" IN ('ready','approved')"),
       pool.query(`
         SELECT COUNT(*)::int as c FROM campaign_journalists
-        WHERE "draftStatus" = 'sent' AND "sentAt"::DATE >= CURRENT_DATE - INTERVAL '7 days'
+        WHERE "draftStatus" = 'sent' AND "sentAt" != '' AND "sentAt"::DATE >= CURRENT_DATE - INTERVAL '7 days'
       `),
       pool.query(`
         SELECT c.id, c.name, c.type, c.status,
