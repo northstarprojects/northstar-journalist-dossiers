@@ -41,3 +41,5 @@ git push
 ```
 
 GitBook will automatically update the public docs site when changes are pushed to the `main` branch.
+
+Railway (backend) and Netlify (frontend) also auto-deploy on every push to `main`.

@@ -6,20 +6,36 @@
 |---|---|
 | Frontend | React + TypeScript + Vite |
 | Backend | Express + TypeScript |
-| Database | SQLite (local) |
+| Database | PostgreSQL (Railway managed) |
 | Styling | Tailwind CSS v3 |
 | AI | Anthropic Claude Opus 4.8 |
 | Email enrichment | Apollo People Match API |
 
-## How it runs
+## Deployment
 
-Both the frontend (port 5173) and backend (port 3001) run locally on your machine. There is no cloud deployment yet — all data lives in a SQLite file at `data/northstar.db` on your laptop.
+The system is fully cloud-hosted — no local installation needed for team members.
 
-## Deployment plan
+| Service | Platform | URL |
+|---|---|---|
+| Frontend | Netlify | https://classy-pegasus-00cc40.netlify.app |
+| Backend API | Railway | https://northstar-journalist-dossiers-production.up.railway.app |
+| Database | Railway (PostgreSQL) | Internal — accessed only by the backend |
 
-- **Frontend** → Netlify
-- **Backend** → Railway
-- **Database** → PostgreSQL (Railway managed, replacing SQLite)
+The frontend is a static React app deployed on Netlify's free tier. The backend is an Express server running on Railway (~$5/month). The PostgreSQL database is a managed Railway add-on with a persistent volume.
+
+## Local development
+
+To run locally, you need Node.js v20 and both services running:
+
+```bash
+# Backend (from /server)
+npm run dev        # runs on :3001
+
+# Frontend (from /client)
+npm run dev        # runs on :5173
+```
+
+Set `DATABASE_URL` in `server/.env` to point at the Railway PostgreSQL instance (or a local Postgres).
 
 ## Data flow
 
@@ -35,10 +51,13 @@ RSS Feeds → RSS Scanner → Journalist Suggestions → (human review) → Jour
 
 | File | Purpose |
 |---|---|
-| `server/src/db.ts` | Database schema and migrations |
+| `server/src/db.ts` | PostgreSQL schema, migrations, and seed data |
 | `server/src/routes/` | API endpoints (one file per resource) |
 | `server/src/services/` | Background jobs, Claude calls, RSS parsing |
 | `client/src/pages/` | One React component per page |
-| `client/src/api.ts` | All frontend API calls |
+| `client/src/api.ts` | All frontend API calls (uses `VITE_API_URL` env var) |
 | `client/src/types.ts` | Shared TypeScript interfaces |
 | `CLAUDE.md` | Persistent context for Claude AI across sessions |
+| `nixpacks.toml` | Pins Node.js 20 for Railway builds |
+| `netlify.toml` | Netlify build config (base dir, redirects) |
+| `railway.json` | Railway build and deploy config |
