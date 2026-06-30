@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Rss, Check, X, ExternalLink, RefreshCw,
-  ChevronLeft, FileText, History, Tag,
+  ChevronLeft, FileText, History, Tag, Info,
 } from 'lucide-react';
 import { journalistSuggestions as api } from '../api';
 import type { JournalistSuggestion } from '../types';
@@ -205,6 +205,54 @@ export default function AdminJournalistSuggestions() {
             <span className="text-slate-400 font-medium">0–2 Low</span>
             <span className="text-slate-300">·</span>
             <span>Sorted by score within each publication</span>
+            {/* Score breakdown tooltip */}
+            <div className="relative ml-auto group/info">
+              <button className="flex items-center gap-1 text-slate-400 hover:text-indigo-500 transition-colors">
+                <Info className="w-3.5 h-3.5" />
+                <span className="text-xs">How scoring works</span>
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg p-4 z-20
+                            invisible opacity-0 group-hover/info:visible group-hover/info:opacity-100
+                            transition-all duration-150 pointer-events-none group-hover/info:pointer-events-auto">
+                {/* bridge to keep tooltip open when moving mouse */}
+                <div className="absolute -top-2 right-0 w-full h-2" />
+                <p className="text-xs font-semibold text-slate-700 mb-3">How the 0–10 score is calculated</p>
+                <p className="text-xs text-slate-500 mb-3">
+                  Each article is scored individually, then points are summed across up to 10 recent articles and capped at 10.
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-slate-600">AI category tag (e.g. <em>ai, llm, openai</em>)</span>
+                    <span className="text-xs font-semibold text-emerald-600 shrink-0">+3 pts</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-slate-600">Startup tag (e.g. <em>funding, venture capital, saas</em>)</span>
+                    <span className="text-xs font-semibold text-emerald-600 shrink-0">+3 pts</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-slate-600">AI or startup keyword in article title</span>
+                    <span className="text-xs font-semibold text-emerald-600 shrink-0">+2 pts</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-slate-600">Enterprise keyword in title (e.g. <em>saas, cloud, api</em>)</span>
+                    <span className="text-xs font-semibold text-emerald-600 shrink-0">+1 pt</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-slate-600">Noise category (e.g. <em>gaming, entertainment, sports</em>)</span>
+                    <span className="text-xs font-semibold text-red-500 shrink-0">−2 pts</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-slate-600">Noise keyword in title</span>
+                    <span className="text-xs font-semibold text-red-500 shrink-0">−2 pts</span>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-slate-100 flex gap-3">
+                  <span className="text-xs text-emerald-700 font-medium">6–10 = High ✓</span>
+                  <span className="text-xs text-amber-700 font-medium">3–5 = Mid</span>
+                  <span className="text-xs text-slate-400 font-medium">0–2 = Low</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
