@@ -132,6 +132,14 @@ export async function discoverAndSaveFeeds(publicationId: number): Promise<FeedD
     }
   }
 
+  // Update publication rssStatus based on whether feeds were found
+  if (feeds.length > 0) {
+    await pool.query(
+      `UPDATE publications SET "rssStatus" = 'active', "rssLastChecked" = NOW()::TEXT WHERE id = $1`,
+      [publicationId]
+    );
+  }
+
   console.log(`[FeedDiscovery] ${pub.name}: ${feeds.length} found, ${added} new`);
   return { publicationId, publicationName: pub.name, feedsFound: feeds.length, feedsAdded: added, feeds };
 }
