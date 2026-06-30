@@ -224,7 +224,7 @@ export default function JournalistsList() {
     api.list({ search, tier, outreachStatus, sortBy })
       .then(r => setList(r.data))
       .finally(() => setLoading(false));
-  }, [search, tier, publicationType, outreachStatus, sortBy]);
+  }, [search, tier, outreachStatus, sortBy]);
 
   const displayed = favOnly ? list.filter(j => j.isFavorite) : list;
 
