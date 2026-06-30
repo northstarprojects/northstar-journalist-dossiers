@@ -407,11 +407,6 @@ export default function JournalistsList() {
                           </div>
                           <span className="font-mono text-xs font-medium text-slate-700">{j.totalScore}</span>
                         </div>
-                        {j.priorityTier > 0 && (
-                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${TIER_COLOURS[j.priorityTier] ?? TIER_COLOURS[4]}`}>
-                            T{j.priorityTier}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
