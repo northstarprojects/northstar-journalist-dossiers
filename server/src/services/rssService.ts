@@ -86,15 +86,40 @@ function scoreAuthor(articles: ArticleData[]): AuthorRelevance {
   };
 }
 
-function inferBeat(matchedTags: string[], categories: string[], title: string): string {
-  const allText = [...matchedTags, ...categories, title].join(' ').toLowerCase();
-  if (/\b(ai|artificial intelligence|machine learning|llm|generative|language model|neural|deep learning|ai agents?)\b/.test(allText)) return 'AI / Machine Learning';
-  if (/\b(startup|funding|series [abc]|venture|seed|raises?)\b/.test(allText)) return 'Startups / Funding';
-  if (/\b(policy|regulation|congress|government|law|privacy)\b/.test(allText)) return 'Tech Policy';
-  if (/\b(cybersecurity|security|hack|breach)\b/.test(allText)) return 'Cybersecurity';
-  if (/\b(crypto|blockchain|web3|bitcoin)\b/.test(allText)) return 'Crypto / Web3';
-  if (/\b(enterprise|saas|b2b|cloud|devops)\b/.test(allText)) return 'Enterprise Tech';
+// Infer topic for a single article based on its own title + categories.
+// Exported so the accept route can label each article individually.
+export function inferArticleTopic(title: string, categories: string[]): string {
+  const cats = categories.map(c => c.toLowerCase().trim());
+  let aiSignals = 0, startupSignals = 0, enterpriseSignals = 0;
+
+  for (const cat of cats) {
+    if (AI_TAGS.has(cat)) aiSignals += 3;
+    else if (STARTUP_TAGS.has(cat)) startupSignals += 3;
+  }
+  if (AI_TITLE_RE.test(title)) aiSignals += 2;
+  if (STARTUP_TITLE_RE.test(title)) startupSignals += 2;
+  if (ENTERPRISE_TITLE_RE.test(title)) enterpriseSignals += 1;
+  // Extra weight for explicit funding/M&A language in titles
+  if (/\b(funding|raises?|raised|series [abc]|seed round|m&a|merger|acquisition|ipo|valuation|investors?|venture|vc\b)/i.test(title)) startupSignals += 2;
+
+  if (/\b(policy|regulation|congress|government|law|privacy|antitrust)\b/i.test(title)) return 'Tech Policy';
+  if (/\b(cybersecurity|security|hack|breach|ransomware)\b/i.test(title)) return 'Cybersecurity';
+  if (/\b(crypto|blockchain|web3|bitcoin|ethereum|defi)\b/i.test(title)) return 'Crypto / Web3';
+
+  if (aiSignals > startupSignals && aiSignals > 0) return 'AI / Machine Learning';
+  if (startupSignals > 0) return 'Startups / Venture Capital';
+  if (enterpriseSignals > 0) return 'Enterprise Tech';
   return 'Technology';
+}
+
+// Infer journalist beat by counting topics across ALL their articles — majority wins.
+function inferBeat(articles: ArticleData[]): string {
+  const counts: Record<string, number> = {};
+  for (const article of articles) {
+    const topic = inferArticleTopic(article.title, article.categories || []);
+    counts[topic] = (counts[topic] || 0) + 1;
+  }
+  return Object.entries(counts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? 'Technology';
 }
 
 function extractAuthor(item: any): string | null {
@@ -210,7 +235,7 @@ export async function scanPublicationRss(publicationId: number): Promise<RssScan
       if (existingNames.has(key) || pendingNames.has(key) || rejectedNames.has(key)) continue;
 
       const { relevanceScore, matchedTags, bestArticle, articleCount } = scoreAuthor(articles);
-      const beat = inferBeat(matchedTags, bestArticle.categories, bestArticle.title);
+      const beat = inferBeat(articles);
 
       await pool.query(`
         INSERT INTO journalist_suggestions

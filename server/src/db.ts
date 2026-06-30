@@ -242,6 +242,29 @@ export async function initDb(): Promise<void> {
         AND "lastContactedDate" = ''
     `);
 
+    // 2026-06-30: Article topics were copied from journalist beat instead of
+    // being inferred per-article. Re-label using title keywords.
+    // Pattern-match the most common cases so existing articles are corrected.
+    await client.query(`
+      UPDATE articles SET topic = CASE
+        WHEN title ~* '\\m(funding|raises?|raised|series [abc]|seed round|m&a|merger|acquisition|ipo|valuation|investors?|venture capital|startup exits|billion.dollar)\\M'
+          THEN 'Startups / Venture Capital'
+        WHEN title ~* '\\m(ai|artificial intelligence|machine learning|llm|llms|gpt|generative ai|openai|anthropic|claude|chatgpt|neural|language model)\\M'
+          THEN 'AI / Machine Learning'
+        WHEN title ~* '\\m(policy|regulation|congress|government|law|privacy|antitrust)\\M'
+          THEN 'Tech Policy'
+        WHEN title ~* '\\m(cybersecurity|security|hack|breach|ransomware)\\M'
+          THEN 'Cybersecurity'
+        WHEN title ~* '\\m(crypto|blockchain|web3|bitcoin)\\M'
+          THEN 'Crypto / Web3'
+        WHEN title ~* '\\m(enterprise|saas|b2b|cloud|devops)\\M'
+          THEN 'Enterprise Tech'
+        ELSE topic
+      END
+      WHERE topic = 'AI / Machine Learning'
+        AND title !~* '\\m(ai|artificial intelligence|machine learning|llm|llms|gpt|generative ai|openai|anthropic|claude|chatgpt|neural|language model)\\M'
+    `);
+
     // Seed campaign type styles
     await client.query(`
       INSERT INTO campaign_type_styles (type, instructions)

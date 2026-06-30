@@ -3,6 +3,7 @@ import pool from '../db';
 import { scanPublicationRss, scanAllRssFeeds } from '../services/rssService';
 import { scanStaffPage } from '../services/staffPageScanner';
 import { analyzeJournalist } from '../services/journalistAnalysis';
+import { inferArticleTopic } from '../services/rssService';
 
 const router = Router();
 
@@ -80,18 +81,21 @@ router.post('/:id/accept', async (req: Request, res: Response) => {
       if (allArticles.length > 0) {
         for (const a of allArticles) {
           if (!a.title || !a.url) continue;
+          // Label each article by its own topic, not the journalist's overall beat
+          const topic = inferArticleTopic(a.title, a.categories || []);
           await pool.query(`
             INSERT INTO articles ("journalistId", title, url, publication, "publishDate", topic)
             VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING
-          `, [created.id, a.title, a.url, suggestion.publicationName || '', a.date || '', suggestion.suggestedBeat || '']);
+          `, [created.id, a.title, a.url, suggestion.publicationName || '', a.date || '', topic]);
           if (a.date && a.date > latestDate) latestDate = a.date;
         }
       } else if (suggestion.recentArticleTitle && suggestion.recentArticleUrl) {
+        const topic = inferArticleTopic(suggestion.recentArticleTitle, []);
         await pool.query(`
           INSERT INTO articles ("journalistId", title, url, publication, "publishDate", topic)
           VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING
         `, [created.id, suggestion.recentArticleTitle, suggestion.recentArticleUrl,
-            suggestion.publicationName || '', suggestion.recentArticleDate || '', suggestion.suggestedBeat || '']);
+            suggestion.publicationName || '', suggestion.recentArticleDate || '', topic]);
         latestDate = suggestion.recentArticleDate || '';
       }
     } catch { /* ignore article seeding failures */ }
@@ -106,12 +110,17 @@ router.post('/:id/accept', async (req: Request, res: Response) => {
     const pub = (await pool.query('SELECT * FROM publications WHERE LOWER(name)=LOWER($1)', [suggestion.publicationName])).rows[0];
     const pubTier = pub?.tier || 'B';
 
+    const allArticleTitles: string[] = allArticles.length > 0
+      ? allArticles.map((a: { title: string }) => a.title).filter(Boolean)
+      : suggestion.recentArticleTitle ? [suggestion.recentArticleTitle] : [];
+
     analyzeJournalist({
       name: suggestion.name, publication: suggestion.publicationName || '',
       publicationTier: pubTier,
       recentArticleTitle: suggestion.recentArticleTitle || '',
       recentArticleUrl: suggestion.recentArticleUrl || '',
       suggestedBeat: suggestion.suggestedBeat || '',
+      allArticleTitles,
     }).then(async analysis => {
       if (!analysis) return;
       const total =
@@ -122,7 +131,7 @@ router.post('/:id/accept', async (req: Request, res: Response) => {
 
       await pool.query(`
         UPDATE journalists SET
-          beat = CASE WHEN beat = '' OR beat IS NULL THEN $1 ELSE beat END,
+          beat = $1,
           "bestPitchAngle"=$2, "aiRelevanceScore"=$3, "startupRelevanceScore"=$4,
           "northStarFitScore"=$5, "publicationAuthorityScore"=$6,
           "audienceReachScore"=$7, "contactabilityScore"=$8,

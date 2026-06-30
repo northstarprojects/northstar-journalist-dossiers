@@ -32,10 +32,11 @@ export async function analyzeJournalist(params: {
   recentArticleTitle: string;
   recentArticleUrl: string;
   suggestedBeat: string;
+  allArticleTitles?: string[]; // All scanned article titles for beat accuracy
 }): Promise<JournalistAnalysis | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
 
-  const { name, publication, publicationTier, recentArticleTitle, recentArticleUrl, suggestedBeat } = params;
+  const { name, publication, publicationTier, recentArticleTitle, recentArticleUrl, suggestedBeat, allArticleTitles } = params;
 
   const tierContext: Record<string, string> = {
     A: 'Major national tech/AI publication (large audience, high industry authority)',
@@ -48,9 +49,11 @@ export async function analyzeJournalist(params: {
 JOURNALIST:
 - Name: ${name}
 - Publication: ${publication} (Tier ${publicationTier}: ${tierContext[publicationTier] || 'unknown tier'})
-- Recent article: "${recentArticleTitle}"
-${recentArticleUrl ? `- Article URL: ${recentArticleUrl}` : ''}
-${suggestedBeat ? `- Detected beat keywords: ${suggestedBeat}` : ''}
+${allArticleTitles && allArticleTitles.length > 1
+  ? `- Recent articles scanned (${allArticleTitles.length}):\n${allArticleTitles.map((t, i) => `  ${i + 1}. "${t}"`).join('\n')}`
+  : `- Recent article: "${recentArticleTitle}"`}
+${recentArticleUrl ? `- Top article URL: ${recentArticleUrl}` : ''}
+${suggestedBeat ? `- Keyword-inferred beat: ${suggestedBeat} (use the article list above to verify or correct this)` : ''}
 
 North Star AI Labs builds AI tools for enterprise. They want coverage in tech, AI, and startup media — especially Southeast US outlets.
 
