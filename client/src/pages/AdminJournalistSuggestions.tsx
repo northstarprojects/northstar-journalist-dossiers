@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Rss, Check, X, ExternalLink, RefreshCw,
-  ChevronLeft, FileText, History, Tag, Info,
+  ChevronLeft, FileText, History, Info,
 } from 'lucide-react';
 import { journalistSuggestions as api } from '../api';
 import type { JournalistSuggestion } from '../types';
@@ -190,36 +190,19 @@ export default function AdminJournalistSuggestions() {
                 {rejectingAll ? 'Skipping…' : `Skip all ${lowIds.length} low-signal`}
               </button>
             )}
-          </div>
-        )}
 
-        {/* Score legend */}
-        {suggestions.length > 0 && (
-          <div className="mb-5 flex items-center gap-4 px-4 py-2.5 bg-white rounded-xl border border-slate-100 text-xs text-slate-500">
-            <Tag className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-            <span>Relevance scored 0–10 across up to 10 recent articles:</span>
-            <span className="text-emerald-700 font-medium">6–10 High</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-amber-700 font-medium">3–5 Mid</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-slate-400 font-medium">0–2 Low</span>
-            <span className="text-slate-300">·</span>
-            <span>Sorted by score within each publication</span>
             {/* Score breakdown tooltip */}
-            <div className="relative ml-auto group/info">
-              <button className="flex items-center gap-1 text-slate-400 hover:text-indigo-500 transition-colors">
+            <div className={`relative group/info ${lowIds.length === 0 ? 'ml-auto' : ''}`}>
+              <button className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-500 transition-colors">
                 <Info className="w-3.5 h-3.5" />
-                <span className="text-xs">How scoring works</span>
+                How scored
               </button>
               <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg p-4 z-20
                             invisible opacity-0 group-hover/info:visible group-hover/info:opacity-100
                             transition-all duration-150 pointer-events-none group-hover/info:pointer-events-auto">
-                {/* bridge to keep tooltip open when moving mouse */}
                 <div className="absolute -top-2 right-0 w-full h-2" />
-                <p className="text-xs font-semibold text-slate-700 mb-3">How the 0–10 score is calculated</p>
-                <p className="text-xs text-slate-500 mb-3">
-                  Each article is scored individually, then points are summed across up to 10 recent articles and capped at 10.
-                </p>
+                <p className="text-xs font-semibold text-slate-700 mb-2">How the 0–10 score is calculated</p>
+                <p className="text-xs text-slate-400 mb-3">Points are summed across up to 10 recent articles, then capped at 10.</p>
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <span className="text-xs text-slate-600">AI category tag (e.g. <em>ai, llm, openai</em>)</span>
@@ -246,10 +229,10 @@ export default function AdminJournalistSuggestions() {
                     <span className="text-xs font-semibold text-red-500 shrink-0">−2 pts</span>
                   </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-slate-100 flex gap-3">
-                  <span className="text-xs text-emerald-700 font-medium">6–10 = High ✓</span>
-                  <span className="text-xs text-amber-700 font-medium">3–5 = Mid</span>
-                  <span className="text-xs text-slate-400 font-medium">0–2 = Low</span>
+                <div className="mt-3 pt-3 border-t border-slate-100 flex gap-4">
+                  <span className="text-xs text-emerald-700 font-medium">6–10 High</span>
+                  <span className="text-xs text-amber-700 font-medium">3–5 Mid</span>
+                  <span className="text-xs text-slate-400 font-medium">0–2 Low</span>
                 </div>
               </div>
             </div>
