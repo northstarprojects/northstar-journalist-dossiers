@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { dashboard } from '../api';
 import type { DashboardData, CampaignType } from '../types';
-import TierBadge from '../components/TierBadge';
 import StatusBadge from '../components/StatusBadge';
 
 const CAMPAIGN_TYPE_LABELS: Record<CampaignType | string, string> = {
@@ -28,7 +27,6 @@ export default function Dashboard() {
 
   if (!data) return <div className="p-8 text-slate-500">Loading...</div>;
 
-  const tierCount = (t: number) => data.tiers.find(x => x.priorityTier === t)?.count || 0;
   const hasAlerts = data.staleJournalists > 0 || data.unreachablePubs > 0;
 
   return (
@@ -120,20 +118,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ── Tier breakdown ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        {[1, 2, 3, 4].map(tier => (
-          <Link key={tier} to={`/journalists?tier=${tier}`} className="card p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <TierBadge tier={tier} />
-              <span className="text-2xl font-bold text-slate-900">{tierCount(tier)}</span>
-            </div>
-            <div className="text-xs text-slate-500">
-              {tier === 1 ? '80–100 pts' : tier === 2 ? '60–79 pts' : tier === 3 ? '40–59 pts' : 'Below 40 pts'}
-            </div>
-          </Link>
-        ))}
-      </div>
 
       {/* ── Follow-ups + Recent outreach ──────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

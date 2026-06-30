@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { journalists as jApi, articles as aApi, outreach as oApi, enrichment as enrichApi } from '../api';
 import type { Journalist, Article, OutreachLog } from '../types';
-import TierBadge from '../components/TierBadge';
 import StatusBadge from '../components/StatusBadge';
 import ArticleForm from '../components/ArticleForm';
 import OutreachForm from '../components/OutreachForm';
@@ -100,7 +99,6 @@ export default function JournalistDetail() {
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-slate-900">{journalist.name}</h1>
-              <TierBadge tier={journalist.priorityTier} />
               <StatusBadge status={journalist.outreachStatus} />
             </div>
             <div className="text-slate-600 mt-1">{journalist.roleTitle && `${journalist.roleTitle} · `}{journalist.publication}</div>

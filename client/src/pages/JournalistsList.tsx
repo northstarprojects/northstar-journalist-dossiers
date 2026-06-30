@@ -18,12 +18,6 @@ const PIPELINE_COLS: { key: string; label: string; color: string; dot: string }[
   { key: 'Covered',         label: 'Covered',         color: 'bg-northstar-50 border-northstar-200', dot: 'bg-northstar-500' },
 ];
 
-const TIER_COLOURS: Record<number, string> = {
-  1: 'bg-northstar-100 text-northstar-700',
-  2: 'bg-blue-100 text-blue-700',
-  3: 'bg-slate-100 text-slate-600',
-  4: 'bg-slate-50  text-slate-400',
-};
 
 // ── Pipeline card ─────────────────────────────────────────────────────────────
 
@@ -48,9 +42,6 @@ function PipelineCard({
           </p>
           <p className="text-xs text-slate-500 truncate mt-0.5">{journalist.publication}</p>
         </div>
-        <span className={`shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded ${TIER_COLOURS[journalist.priorityTier] ?? TIER_COLOURS[4]}`}>
-          T{journalist.priorityTier}
-        </span>
       </div>
       {journalist.beat && (
         <p className="text-xs text-slate-400 mt-1.5 truncate">{journalist.beat}</p>
@@ -122,7 +113,6 @@ export default function JournalistsList() {
   const dragJournalist = useRef<Journalist | null>(null);
 
   const search = searchParams.get('search') || '';
-  const tier = searchParams.get('tier') || '';
   const outreachStatus = searchParams.get('outreachStatus') || '';
   const sortBy = searchParams.get('sortBy') || 'totalScore';
   const favOnly = searchParams.get('favOnly') === '1';
@@ -145,7 +135,7 @@ export default function JournalistsList() {
   };
 
   const reload = () =>
-    api.list({ search, tier, outreachStatus, sortBy })
+    api.list({ search, outreachStatus, sortBy })
       .then(r => setList(r.data));
 
   const handleBulkRescore = async () => {
@@ -206,10 +196,10 @@ export default function JournalistsList() {
 
   useEffect(() => {
     setLoading(true);
-    api.list({ search, tier, outreachStatus, sortBy })
+    api.list({ search, outreachStatus, sortBy })
       .then(r => setList(r.data))
       .finally(() => setLoading(false));
-  }, [search, tier, outreachStatus, sortBy]);
+  }, [search, outreachStatus, sortBy]);
 
   const displayed = favOnly ? list.filter(j => j.isFavorite) : list;
 
@@ -300,10 +290,6 @@ export default function JournalistsList() {
           <Star className={`w-3.5 h-3.5 ${favOnly ? 'fill-amber-500 text-amber-500' : ''}`} />
           Favourites
         </button>
-        <select className="form-select w-auto" value={tier} onChange={e => update('tier', e.target.value)}>
-          <option value="">All Tiers</option>
-          {[1,2,3,4].map(t => <option key={t} value={t}>Tier {t}</option>)}
-        </select>
         {view === 'list' && (
           <select className="form-select w-auto" value={outreachStatus} onChange={e => update('outreachStatus', e.target.value)}>
             <option value="">All Statuses</option>
