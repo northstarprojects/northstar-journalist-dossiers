@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Edit2, Trash2, ExternalLink, Mail, AtSign, Link2, Globe, FileText,
-  MessageSquare, ChevronLeft, Plus, Target, Sparkles, TrendingUp,
+  MessageSquare, ChevronLeft, Plus, Target, TrendingUp,
   Clock, Send, CheckCircle2, XCircle, AlertCircle,
 } from 'lucide-react';
 import { journalists as jApi, articles as aApi, outreach as oApi, enrichment as enrichApi } from '../api';
@@ -17,7 +17,11 @@ export default function JournalistDetail() {
   const [journalist, setJournalist] = useState<Journalist | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [outreach, setOutreach] = useState<OutreachLog[]>([]);
-  const [tab, setTab] = useState<'overview' | 'articles' | 'outreach' | 'briefing'>('overview');
+  const [tab, setTab] = useState<'overview' | 'articles' | 'outreach' | 'notes'>('overview');
+  const [notesText, setNotesText] = useState('');
+  const [pitchAngleText, setPitchAngleText] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
   const [showArticleForm, setShowArticleForm] = useState(false);
   const [showOutreachForm, setShowOutreachForm] = useState(false);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
@@ -27,7 +31,11 @@ export default function JournalistDetail() {
 
   const loadData = () => {
     if (!id) return;
-    jApi.get(Number(id)).then(r => setJournalist(r.data));
+    jApi.get(Number(id)).then(r => {
+      setJournalist(r.data);
+      setNotesText(r.data.notes || '');
+      setPitchAngleText(r.data.bestPitchAngle || '');
+    });
     aApi.byJournalist(Number(id)).then(r => setArticles(r.data));
     oApi.byJournalist(Number(id)).then(r => setOutreach(r.data));
   };
@@ -55,6 +63,15 @@ export default function JournalistDetail() {
     }
   };
 
+  const handleSaveNotes = async () => {
+    if (!journalist) return;
+    setNotesSaving(true);
+    await jApi.update(journalist.id, { notes: notesText, bestPitchAngle: pitchAngleText });
+    setNotesSaving(false);
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
+  };
+
   if (!journalist) return <div className="p-8 text-slate-400">Loading...</div>;
 
   // ── Relationship stats derived from outreach logs ──────────────────────
@@ -78,12 +95,12 @@ export default function JournalistDetail() {
   const lastLog = outreach[0]; // already sorted desc by server
 
   const scoreItems = [
-    { label: 'AI Relevance', value: journalist.aiRelevanceScore, max: 25 },
-    { label: 'Startup Relevance', value: journalist.startupRelevanceScore, max: 20 },
-    { label: 'North Star Fit', value: journalist.northStarFitScore, max: 20 },
-    { label: 'Publication Authority', value: journalist.publicationAuthorityScore, max: 15 },
-    { label: 'Audience Reach', value: journalist.audienceReachScore, max: 10 },
-    { label: 'Contactability', value: journalist.contactabilityScore, max: 10 },
+    { label: 'AI Relevance', value: journalist.aiRelevanceScore, max: 25, desc: 'How closely their beat matches AI, ML, and LLM topics' },
+    { label: 'Startup Relevance', value: journalist.startupRelevanceScore, max: 20, desc: 'Whether they cover startups, funding rounds, and founders' },
+    { label: 'North Star Fit', value: journalist.northStarFitScore, max: 20, desc: 'Likelihood they would cover an AI enterprise startup like ours' },
+    { label: 'Publication Authority', value: journalist.publicationAuthorityScore, max: 15, desc: 'Reach and credibility of their publication' },
+    { label: 'Audience Reach', value: journalist.audienceReachScore, max: 10, desc: 'Estimated readership and social following' },
+    { label: 'Contactability', value: journalist.contactabilityScore, max: 10, desc: 'Whether we have verified contact info for this journalist' },
   ];
 
   return (
@@ -238,7 +255,7 @@ export default function JournalistDetail() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-5 gap-0">
-        {(['overview', 'articles', 'outreach', 'briefing'] as const).map(t => (
+        {(['overview', 'articles', 'outreach', 'notes'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -246,7 +263,7 @@ export default function JournalistDetail() {
               tab === t ? 'border-northstar-600 text-northstar-600' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            {t === 'articles' ? `Articles (${articles.length})` : t === 'outreach' ? `Outreach (${outreach.length})` : t}
+            {t === 'articles' ? `Articles (${articles.length})` : t === 'outreach' ? `Outreach (${outreach.length})` : t === 'notes' ? 'Admin Notes' : t}
           </button>
         ))}
       </div>
@@ -259,10 +276,11 @@ export default function JournalistDetail() {
             <div className="space-y-3">
               {scoreItems.map(s => (
                 <div key={s.label}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-slate-600">{s.label}</span>
-                    <span className="font-medium text-slate-900">{s.value} / {s.max}</span>
+                  <div className="flex justify-between text-sm mb-0.5">
+                    <span className="text-slate-700 font-medium">{s.label}</span>
+                    <span className="font-semibold text-slate-900">{s.value} / {s.max}</span>
                   </div>
+                  <p className="text-xs text-slate-400 mb-1">{s.desc}</p>
                   <div className="w-full bg-slate-100 rounded-full h-2">
                     <div
                       className="bg-northstar-500 h-2 rounded-full transition-all"
@@ -480,132 +498,44 @@ export default function JournalistDetail() {
         </div>
       )}
 
-      {/* Briefing tab */}
-      {tab === 'briefing' && (
-        <BriefingView journalist={journalist} articles={articles} outreach={outreach} />
-      )}
-    </div>
-  );
-}
-
-function BriefingView({ journalist, articles, outreach: _outreach }: { journalist: Journalist; articles: Article[]; outreach: OutreachLog[] }) {
-  const recentArticles = articles.slice(0, 6);
-  const themes = [...new Set(articles.map(a => a.topic).filter(Boolean))].slice(0, 8);
-
-  const nextAction = journalist.outreachStatus === 'Not Started'
-    ? { label: 'Never contacted', action: 'Start with a brief intro email referencing their recent work.', color: 'bg-slate-50 border-slate-200 text-slate-700' }
-    : journalist.outreachStatus === 'Ready to Pitch'
-    ? { label: 'Ready to pitch', action: 'Prepare a personalised pitch. Use Campaigns to generate a Claude draft.', color: 'bg-northstar-50 border-northstar-200 text-northstar-800' }
-    : journalist.outreachStatus === 'Pitched'
-    ? { label: 'Awaiting reply', action: 'Follow up if no response after 5–7 business days.', color: 'bg-amber-50 border-amber-200 text-amber-800' }
-    : journalist.outreachStatus === 'Responded'
-    ? { label: 'In conversation', action: 'Respond promptly and offer a briefing or exclusive angle.', color: 'bg-blue-50 border-blue-200 text-blue-800' }
-    : journalist.outreachStatus === 'Covered'
-    ? { label: 'Has covered us ✓', action: 'Send a thank-you and stay in touch for future stories.', color: 'bg-emerald-50 border-emerald-200 text-emerald-800' }
-    : { label: journalist.outreachStatus, action: 'Continue relationship building.', color: 'bg-slate-50 border-slate-200 text-slate-700' };
-
-  return (
-    <div className="space-y-5">
-      {/* Next recommended action */}
-      <div className={`rounded-xl border p-4 ${nextAction.color}`}>
-        <div className="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Recommended next action · {nextAction.label}</div>
-        <p className="text-sm font-medium">{nextAction.action}</p>
-        <Link to="/campaigns" className="inline-block mt-2 text-xs font-medium underline underline-offset-2 opacity-70 hover:opacity-100">
-          Open Campaigns →
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Profile snapshot */}
-        <div className="card p-5">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-northstar-500" /> Quick Profile
-          </h3>
-          <dl className="space-y-2 text-sm">
-            {[
-              ['Beat', journalist.beat],
-              ['Role', journalist.roleTitle],
-              ['Publication', journalist.publication],
-              ['Location', journalist.location],
-            ].map(([label, value]) => value ? (
-              <div key={label} className="flex gap-3">
-                <dt className="text-slate-400 w-24 shrink-0">{label}</dt>
-                <dd className="text-slate-800 font-medium">{value}</dd>
-              </div>
-            ) : null)}
-            <div className="flex gap-3">
-              <dt className="text-slate-400 w-24 shrink-0">Score</dt>
-              <dd className="font-bold text-northstar-600">{journalist.totalScore} / 100</dd>
-            </div>
-            {journalist.outreachStatus !== 'Not Started' && (
-              <div className="flex gap-3">
-                <dt className="text-slate-400 w-24 shrink-0">Status</dt>
-                <dd><StatusBadge status={journalist.outreachStatus} /></dd>
-              </div>
-            )}
-          </dl>
-          {journalist.bestPitchAngle && (
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">Best pitch angle</div>
-              <p className="text-sm text-slate-700 leading-relaxed">{journalist.bestPitchAngle}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Writing themes */}
-        <div className="card p-5">
-          <h3 className="font-semibold text-slate-900 mb-3">Writing Themes</h3>
-          {themes.length > 0 ? (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {themes.map(t => (
-                <span key={t} className="bg-northstar-50 text-northstar-700 text-xs px-2.5 py-1 rounded-full border border-northstar-100">{t}</span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400 mb-4">No article topics tagged yet. Add articles in the Articles tab.</p>
-          )}
-
-          {journalist.notes && (
-            <div className="pt-3 border-t border-slate-100">
-              <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">Notes</div>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{journalist.notes}</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Recent articles */}
-      {recentArticles.length > 0 && (
-        <div className="card p-5">
-          <h3 className="font-semibold text-slate-900 mb-3">Recent Articles ({articles.length} total)</h3>
-          <div className="space-y-2">
-            {recentArticles.map(a => (
-              <div key={a.id} className="flex items-start gap-3 py-2 border-b border-slate-50 last:border-0">
-                <div className="flex-1 min-w-0">
-                  <a href={a.url} target="_blank" rel="noreferrer"
-                    className="text-sm font-medium text-slate-800 hover:text-northstar-600 flex items-center gap-1">
-                    {a.title} {a.url && <ExternalLink className="w-3 h-3 shrink-0 opacity-40" />}
-                  </a>
-                  <div className="flex gap-3 text-xs text-slate-400 mt-0.5">
-                    {a.publishDate && <span>{a.publishDate}</span>}
-                    {a.topic && <span>· {a.topic}</span>}
-                  </div>
-                </div>
-                {a.relevanceToNorthStar && (
-                  <span className="text-xs bg-northstar-50 text-northstar-600 px-2 py-0.5 rounded shrink-0 max-w-[160px] truncate" title={a.relevanceToNorthStar}>
-                    {a.relevanceToNorthStar}
-                  </span>
-                )}
-              </div>
-            ))}
+      {/* Admin Notes tab */}
+      {tab === 'notes' && (
+        <div className="space-y-5 max-w-2xl">
+          <div className="card p-5">
+            <h3 className="font-semibold text-slate-900 mb-1">Best Pitch Angle</h3>
+            <p className="text-xs text-slate-400 mb-3">The hook or angle most likely to resonate with this journalist. Auto-filled by Claude when accepted from RSS — edit freely.</p>
+            <textarea
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-northstar-300 resize-none"
+              rows={3}
+              value={pitchAngleText}
+              onChange={e => setPitchAngleText(e.target.value)}
+              placeholder="e.g. Angle around AI infrastructure for mid-market — she covers cost/efficiency stories heavily"
+            />
           </div>
-          {articles.length > 6 && (
-            <button onClick={() => {}} className="mt-3 text-xs text-northstar-600 hover:underline">
-              + {articles.length - 6} more in Articles tab
+          <div className="card p-5">
+            <h3 className="font-semibold text-slate-900 mb-1">Notes</h3>
+            <p className="text-xs text-slate-400 mb-3">Internal notes about this journalist — background, preferences, past conversations, anything useful for outreach.</p>
+            <textarea
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-northstar-300 resize-none"
+              rows={10}
+              value={notesText}
+              onChange={e => setNotesText(e.target.value)}
+              placeholder="Add internal notes here..."
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              className="btn-primary"
+              onClick={handleSaveNotes}
+              disabled={notesSaving}
+            >
+              {notesSaving ? 'Saving…' : 'Save Notes'}
             </button>
-          )}
+            {notesSaved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+          </div>
         </div>
       )}
     </div>
   );
 }
+
