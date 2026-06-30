@@ -212,8 +212,7 @@ export default function AdminJournalistSuggestions() {
         <div className="mb-5 flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
           <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <span>
-            <span className="font-semibold">Always verify the author name</span> before accepting.
-            RSS feeds sometimes misattribute articles — click the article link to confirm the byline matches the name shown here.
+            <span className="font-semibold">Verify the author name</span> before accepting — RSS feeds sometimes misattribute articles. Click any article link to confirm the byline.
           </span>
         </div>
 
