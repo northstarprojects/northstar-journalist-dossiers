@@ -232,6 +232,16 @@ export async function initDb(): Promise<void> {
       ALTER TABLE campaign_journalists ADD COLUMN IF NOT EXISTS "sentAt"   TEXT DEFAULT '';
     `);
 
+    // ── One-time data migrations ──────────────────────────────────────────────
+    // 2026-06-30: RSS-accepted journalists were incorrectly defaulted to
+    // 'Researching'. Reset to 'Not Started' so the pipeline reflects reality.
+    await client.query(`
+      UPDATE journalists SET "outreachStatus" = 'Not Started'
+      WHERE "outreachStatus" = 'Researching'
+        AND notes ILIKE '%Discovered via RSS%'
+        AND "lastContactedDate" = ''
+    `);
+
     // Seed campaign type styles
     await client.query(`
       INSERT INTO campaign_type_styles (type, instructions)
