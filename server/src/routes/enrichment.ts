@@ -4,6 +4,19 @@ import pool from '../db';
 
 const router = Router();
 
+// GET /api/enrichment/credits — SerpAPI remaining searches
+router.get('/credits', async (_req, res) => {
+  const apiKey = process.env.SERP_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'SERP_API_KEY not set' });
+  try {
+    const r = await axios.get('https://serpapi.com/account', { params: { api_key: apiKey } });
+    const { plan_searches_left, total_searches_done, plan_monthly_searches } = r.data;
+    res.json({ searches_left: plan_searches_left, searches_done: total_searches_done, searches_limit: plan_monthly_searches });
+  } catch (err: any) {
+    res.status(500).json({ error: err.response?.data?.error || err.message });
+  }
+});
+
 // POST /api/enrichment/:id/profiles — find LinkedIn, MuckRack, Twitter via SerpAPI
 router.post('/:id/profiles', async (req, res) => {
   const apiKey = process.env.SERP_API_KEY;

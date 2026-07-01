@@ -109,6 +109,7 @@ export default function JournalistsList() {
   const [rescoring, setRescoring] = useState(false);
   const [rescoreMsg, setRescoreMsg] = useState('');
   const [findingProfiles, setFindingProfiles] = useState(false);
+  const [serpCredits, setSerpCredits] = useState<{ searches_left: number; searches_limit: number } | null>(null);
   const [view, setView] = useState<'list' | 'pipeline'>('list');
   const dragJournalist = useRef<Journalist | null>(null);
 
@@ -201,6 +202,10 @@ export default function JournalistsList() {
       .finally(() => setLoading(false));
   }, [search, outreachStatus, sortBy]);
 
+  useEffect(() => {
+    enrichApi.credits().then(r => setSerpCredits(r.data)).catch(() => {});
+  }, []);
+
   const displayed = favOnly ? list.filter(j => j.isFavorite) : list;
 
   // Group for pipeline view (use full `list`, not filtered, so all cols visible)
@@ -237,15 +242,31 @@ export default function JournalistsList() {
           </div>
 
           {missingProfileCount > 0 && (
-            <button
-              onClick={handleBulkProfiles}
-              disabled={findingProfiles}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-50 border border-teal-200 text-teal-700 text-sm font-medium hover:bg-teal-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Find LinkedIn, MuckRack, and Twitter profiles via SerpAPI"
-            >
-              <Link2 className="w-4 h-4" />
-              {findingProfiles ? 'Finding profiles…' : `Find profiles via SerpAPI (${missingProfileCount})`}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBulkProfiles}
+                disabled={findingProfiles}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-50 border border-teal-200 text-teal-700 text-sm font-medium hover:bg-teal-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Find LinkedIn, MuckRack, and Twitter profiles via SerpAPI"
+              >
+                <Link2 className="w-4 h-4" />
+                {findingProfiles ? 'Finding profiles…' : `Find profiles via SerpAPI (${missingProfileCount})`}
+              </button>
+              {serpCredits && (
+                <span
+                  className={`text-xs px-2 py-1 rounded-md border font-medium ${
+                    serpCredits.searches_left < 20
+                      ? 'bg-rose-50 border-rose-200 text-rose-600'
+                      : serpCredits.searches_left < 100
+                      ? 'bg-amber-50 border-amber-200 text-amber-600'
+                      : 'bg-slate-50 border-slate-200 text-slate-500'
+                  }`}
+                  title={`${serpCredits.searches_left} of ${serpCredits.searches_limit} searches remaining this month`}
+                >
+                  {serpCredits.searches_left} searches left
+                </span>
+              )}
+            </div>
           )}
           {unscoredCount > 0 && (
             <button

@@ -107,6 +107,7 @@ export const campaignStyles = {
 };
 
 export const enrichment = {
+  credits:       ()           => api.get('/enrichment/credits'),
   findProfiles:  (id: number) => api.post(`/enrichment/${id}/profiles`),
   bulkProfiles:  ()           => api.post('/enrichment/bulk/profiles'),
 };
