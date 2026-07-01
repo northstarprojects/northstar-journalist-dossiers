@@ -220,7 +220,7 @@ function OnboardingChecklist() {
     {
       n: 4, done: false,
       label: 'Add contact info (emails)',
-      detail: 'Use "Find emails via Apollo" on each journalist, or add emails manually.',
+      detail: 'Use "Find profiles via SerpAPI" to discover LinkedIn and MuckRack profiles, then add contact info manually.',
       link: '/journalists', cta: 'Open Journalists →',
     },
     {

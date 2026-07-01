@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, ChevronRight, SortDesc, Sparkles, Star, Mail, LayoutList, Columns, CheckCircle2, Circle, Link2 } from 'lucide-react';
+import { Search, ChevronRight, SortDesc, Sparkles, Star, LayoutList, Columns, CheckCircle2, Circle, Link2 } from 'lucide-react';
 import { journalists as api, enrichment as enrichApi } from '../api';
 import type { Journalist } from '../types';
 import StatusBadge from '../components/StatusBadge';
@@ -108,9 +108,7 @@ export default function JournalistsList() {
   const [loading, setLoading] = useState(true);
   const [rescoring, setRescoring] = useState(false);
   const [rescoreMsg, setRescoreMsg] = useState('');
-  const [enriching, setEnriching] = useState(false);
   const [findingProfiles, setFindingProfiles] = useState(false);
-  const [apolloCredits, setApolloCredits] = useState<{ credits_used: number; credits_limit: number; credits_remaining: number } | null>(null);
   const [view, setView] = useState<'list' | 'pipeline'>('list');
   const dragJournalist = useRef<Journalist | null>(null);
 
@@ -120,22 +118,7 @@ export default function JournalistsList() {
   const favOnly = searchParams.get('favOnly') === '1';
 
   const unscoredCount = list.filter(j => j.totalScore === 0).length;
-  const missingEmailCount = list.filter(j => !j.email).length;
   const missingProfileCount = list.filter(j => !j.linkedinUrl && !j.muckRackUrl).length;
-
-  const handleBulkEnrich = async () => {
-    setEnriching(true);
-    setRescoreMsg('');
-    try {
-      const res = await enrichApi.bulkRun();
-      setRescoreMsg(res.data.message);
-      setTimeout(reload, 30_000);
-    } catch (err: any) {
-      setRescoreMsg(err.response?.data?.error || 'Enrichment failed. Check server logs.');
-    } finally {
-      setEnriching(false);
-    }
-  };
 
   const reload = () =>
     api.list({ search, outreachStatus, sortBy })
@@ -218,10 +201,6 @@ export default function JournalistsList() {
       .finally(() => setLoading(false));
   }, [search, outreachStatus, sortBy]);
 
-  useEffect(() => {
-    enrichApi.credits().then(r => setApolloCredits(r.data)).catch(() => {});
-  }, []);
-
   const displayed = favOnly ? list.filter(j => j.isFavorite) : list;
 
   // Group for pipeline view (use full `list`, not filtered, so all cols visible)
@@ -257,33 +236,6 @@ export default function JournalistsList() {
             </button>
           </div>
 
-          {missingEmailCount > 0 && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleBulkEnrich}
-                disabled={enriching}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title="Look up missing emails via Apollo"
-              >
-                <Mail className="w-4 h-4" />
-                {enriching ? 'Looking up emails…' : `Find emails via Apollo (${missingEmailCount})`}
-              </button>
-              {apolloCredits && (
-                <span
-                  className={`text-xs px-2 py-1 rounded-md border font-medium ${
-                    apolloCredits.credits_remaining < 50
-                      ? 'bg-rose-50 border-rose-200 text-rose-600'
-                      : apolloCredits.credits_remaining < 200
-                      ? 'bg-amber-50 border-amber-200 text-amber-600'
-                      : 'bg-slate-50 border-slate-200 text-slate-500'
-                  }`}
-                  title={`${apolloCredits.credits_used} used / ${apolloCredits.credits_limit} total`}
-                >
-                  {apolloCredits.credits_remaining} credits left
-                </span>
-              )}
-            </div>
-          )}
           {missingProfileCount > 0 && (
             <button
               onClick={handleBulkProfiles}

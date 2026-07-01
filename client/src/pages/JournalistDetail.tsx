@@ -26,8 +26,6 @@ export default function JournalistDetail() {
   const [showOutreachForm, setShowOutreachForm] = useState(false);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [editingOutreach, setEditingOutreach] = useState<OutreachLog | null>(null);
-  const [enriching, setEnriching] = useState(false);
-  const [enrichResult, setEnrichResult] = useState<{ email?: string; status?: string; error?: string } | null>(null);
   const [findingProfiles, setFindingProfiles] = useState(false);
   const [profileResult, setProfileResult] = useState<{ linkedinUrl?: string; muckrackUrl?: string; twitterUrl?: string; error?: string } | null>(null);
 
@@ -48,21 +46,6 @@ export default function JournalistDetail() {
     if (!confirm('Delete this journalist? This cannot be undone.')) return;
     await jApi.delete(Number(id));
     navigate('/journalists');
-  };
-
-  const handleEnrich = async () => {
-    setEnriching(true);
-    setEnrichResult(null);
-    try {
-      const r = await enrichApi.enrich(Number(id));
-      const { email, emailStatus, saved } = r.data;
-      setEnrichResult({ email, status: emailStatus });
-      if (saved) loadData(); // refresh journalist so email appears in contact links
-    } catch (err: any) {
-      setEnrichResult({ error: err.response?.data?.error || 'Apollo lookup failed.' });
-    } finally {
-      setEnriching(false);
-    }
   };
 
   const handleFindProfiles = async () => {
@@ -145,26 +128,6 @@ export default function JournalistDetail() {
                   <Mail className="w-3 h-3" /> {journalist.email}
                 </a>
               )}
-              {!journalist.email && (
-                <button
-                  onClick={handleEnrich}
-                  disabled={enriching}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-500 hover:border-northstar-400 hover:text-northstar-600 hover:bg-northstar-50 transition-colors disabled:opacity-50"
-                >
-                  <Mail className="w-3 h-3" />
-                  {enriching ? 'Looking up via Apollo…' : 'Find email via Apollo'}
-                </button>
-              )}
-              {journalist.email && (
-                <button
-                  onClick={handleEnrich}
-                  disabled={enriching}
-                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-northstar-600 transition-colors disabled:opacity-50"
-                  title="Re-run Apollo lookup"
-                >
-                  {enriching ? '…' : '↻ Apollo'}
-                </button>
-              )}
               {!journalist.linkedinUrl && !journalist.muckRackUrl && (
                 <button
                   onClick={handleFindProfiles}
@@ -201,27 +164,6 @@ export default function JournalistDetail() {
                 </a>
               )}
             </div>
-
-            {/* Apollo enrichment result */}
-            {enrichResult && (
-              <div className={`mt-3 px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
-                enrichResult.error
-                  ? 'bg-rose-50 border border-rose-200 text-rose-700'
-                  : 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-              }`}>
-                {enrichResult.error ? (
-                  <><XCircle className="w-3.5 h-3.5 shrink-0" /> {enrichResult.error}</>
-                ) : (
-                  <><CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    Found: <strong>{enrichResult.email}</strong>
-                    {enrichResult.status && enrichResult.status !== 'unknown' && (
-                      <span className="ml-1 text-xs opacity-70">({enrichResult.status})</span>
-                    )}
-                    {journalist.email ? ' — already saved to profile.' : ' — saved to profile.'}
-                  </>
-                )}
-              </div>
-            )}
 
             {/* SerpAPI profile result */}
             {profileResult && (
