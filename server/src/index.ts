@@ -11,7 +11,7 @@ import suggestionsRouter from './routes/suggestions';
 import journalistSuggestionsRouter from './routes/journalistSuggestions';
 import { startSuggestionCron, runSuggestionJob } from './cron/suggestionJob';
 import { startRssCron } from './cron/rssJob';
-import { scanAllRssFeeds, inferArticleTopic } from './services/rssService';
+import { scanAllRssFeeds } from './services/rssService';
 import { discoverAndSaveFeeds } from './services/categoryFeedDiscovery';
 import { startHealthCheckCron, runHealthChecks } from './cron/healthCheckJob';
 import { refreshAllJournalistArticles } from './services/refreshJournalistArticles';
@@ -124,67 +124,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// ── One-time beat fix (2026-06-30) — remove after running ────────────────────
-app.post('/api/admin/fix-beats', async (_req, res) => {
-  const results: { journalists: number; suggestions: number; errors: string[] } = {
-    journalists: 0, suggestions: 0, errors: [],
-  };
 
-  // 1. Fix accepted journalists: derive beat from majority topic across their articles
-  try {
-    const journalists = (await pool.query('SELECT id, name FROM journalists')).rows;
-    for (const j of journalists) {
-      const articles = (await pool.query(
-        'SELECT title FROM articles WHERE "journalistId" = $1', [j.id]
-      )).rows;
-      if (articles.length === 0) continue;
-
-      // Majority-vote topic across all articles
-      const counts: Record<string, number> = {};
-      for (const a of articles) {
-        const topic = inferArticleTopic(a.title, []);
-        counts[topic] = (counts[topic] || 0) + 1;
-      }
-      const beat = Object.entries(counts).sort(([, a], [, b]) => b - a)[0][0];
-      await pool.query('UPDATE journalists SET beat = $1 WHERE id = $2', [beat, j.id]);
-      results.journalists++;
-      console.log(`[FixBeats] ${j.name} → ${beat}`);
-    }
-  } catch (err: any) {
-    results.errors.push(`Journalists: ${err.message}`);
-  }
-
-  // 2. Fix pending suggestions: re-run inferBeat on stored allArticles JSON
-  try {
-    const suggestions = (await pool.query(
-      `SELECT id, name, "allArticles", "recentArticleTitle" FROM journalist_suggestions WHERE status = 'pending'`
-    )).rows;
-    for (const s of suggestions) {
-      try {
-        const articles: { title: string; categories?: string[] }[] =
-          s.allArticles ? JSON.parse(s.allArticles) : [];
-        const titles: { title: string; categories?: string[] }[] = articles.length > 0 ? articles : [{ title: s.recentArticleTitle || '' }];
-
-        const counts: Record<string, number> = {};
-        for (const a of titles) {
-          const topic = inferArticleTopic(a.title || '', a.categories || []);
-          counts[topic] = (counts[topic] || 0) + 1;
-        }
-        const beat = Object.entries(counts).sort(([, a], [, b]) => b - a)[0][0];
-        await pool.query(
-          'UPDATE journalist_suggestions SET "suggestedBeat" = $1 WHERE id = $2', [beat, s.id]
-        );
-        results.suggestions++;
-      } catch (innerErr: any) {
-        results.errors.push(`Suggestion ${s.id} (${s.name}): ${innerErr.message}`);
-      }
-    }
-  } catch (err: any) {
-    results.errors.push(`Suggestions: ${err.message}`);
-  }
-
-  res.json({ message: 'Beat fix complete', ...results });
-});
 
 // ── Manual triggers (admin use) ───────────────────────────────────────────────
 app.post('/api/suggestions/run-now', async (_req, res) => {
